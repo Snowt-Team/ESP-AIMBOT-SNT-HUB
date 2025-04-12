@@ -521,7 +521,7 @@ Tabs.AimbotTab:Toggle({
                 if connection.Function == updateCameraLookAt then
                     connection:Disconnect()
                     break
-               
+               end
             end
         end
     end
