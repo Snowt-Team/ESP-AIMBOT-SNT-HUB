@@ -366,176 +366,119 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
-local Players = game:GetService("Players")
+-- Вкладка "Аимбот"
 local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+local localPlayer = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+local overheadCameraEnabled = false
+local defaultCameraType = Enum.CameraType.Custom -- Or whatever the default is
+
+-- Function to set the overhead camera view
+local function setOverheadCamera()
+    if localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local rootPart = localPlayer.Character.HumanoidRootPart
+        local overheadPosition = rootPart.Position + Vector3.new(0, 30, 0)
+        local lookAtPosition = rootPart.Position
+        camera.CameraType = Enum.CameraType.Scriptable
+        camera.CFrame = CFrame.lookAt(overheadPosition, lookAtPosition)
+    end
+end
+
+-- Function to reset the camera to the default type
+local function resetCamera()
+    camera.CameraType = defaultCameraType
+end
+
+-- The Toggle function (assuming 'Tabs.AimbotTab' is a UI element handler)
+
+Tabs.AimbotTab:Toggle({
+        Title = "Enable Overhead Camera",
+        Default = false,
+        Callback = function(Value)
+            overheadCameraEnabled = Value
+            if Value == true then
+                setOverheadCamera()
+            else
+                resetCamera()
+            end
+end})
+
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager") -- Может потребоваться
 
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local localPlayer = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+local isCameraLocked = false
+local lockedPlayer = nil
+local defaultCameraType = Enum.CameraType.Custom -- Or your desired default
 
-local Settings = {
-    Enabled = false,
-    AimRadius = 50,
-    TargetPart = "Head",
-    SmoothingFactor = 0.2,
-    ActivationTouch = "RightThumb" -- Пример: "LeftThumb", "RightThumb"
-}
+local function getNearestPlayer()
+    local nearestPlayer = nil
+    local minDistanceSquared = math.huge
 
--- // UI (WindUI) - аналогично ПК версии, но без настроек клавиши
-
--- // Функция поиска ближайшего игрока (аналогично ПК версии)
-local function getClosestMobileTarget()
-    -- ... (логика поиска ближайшего игрока) ...
-    return closestTarget, targetPart
-end
-
-local lastTargetPosition = nil
-local currentCameraCF = nil
-
--- // Функция для плавной коррекции угла камеры
-local function smoothLookAt(lookVector)
-    if not currentCameraCF then
-        currentCameraCF = Camera.CFrame
-    end
-    local targetCF = CFrame.lookAt(Camera.CFrame.Position, Camera.CFrame.Position + lookVector)
-    currentCameraCF = currentCameraCF:Lerp(targetCF, Settings.SmoothingFactor)
-    Camera.CFrame = currentCameraCF
-end
-
-RunService.RenderStepped:Connect(function()
-    if Settings.Enabled and UserInputService:IsTouchDown(Enum.UserInputType[Settings.ActivationTouch]) then
-        local target, targetPart = getClosestMobileTarget()
-        if target and targetPart then
-            local targetPosition = targetPart.Position
-            local lookVector = (targetPosition - Camera.CFrame.Position).Unit
-            smoothLookAt(lookVector)
-            lastTargetPosition = targetPosition
-        else
-            currentCameraCF = nil
-            lastTargetPosition = nil
-        end
-    else
-        currentCameraCF = nil
-        lastTargetPosition = nil
-    end
-end)
-
-Tabs.AimbotTab:Toggle({
-    Title = "Enable mobile aimbot",
-    Default = false,
-    Callback = function(State)
-        
-end
-})
-
-Tabs.AimbotTab:Toggle({
-    Title = "Enable Aimbot",
-    Default = false,
-    Callback = function(state)
-        Settings.Enabled = state
-        if state == true then
-            getClosestPlayer()
-            aimAtTarget(target)
-        end
-end
-})
-
-Tabs.AimbotTab:Dropdown({
-    Title = "Activation Key",
-    Values = {"LeftShift", "RightShift", "E", "Q", "MouseButton1", "MouseButton2"},
-    Value = "RightShift",
-    Callback = function(key)
-        Settings.AimKey = key
-    end
-})
-
-Tabs.AimbotTab:Slider({
-    Title = "Aim Radius",
-    Value = {
-        Min = 10,
-        Max = 200,
-        Default = 50,
-    },
-    Callback = function(radius)
-        Settings.AimRadius = radius
-    end
-})
-
-Tabs.AimbotTab:Toggle({
-    Title = "Enable Prediction",
-    Default = false,
-    Callback = function(state)
-        Settings.Prediction = state
-    end
-})
-
-local function getClosestPlayer()
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    if not LocalPlayer or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+    if not localPlayer or not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
         return nil
     end
-    local LocalRootPart = LocalPlayer.Character.HumanoidRootPart
-    local closestTarget = nil
-    local closestDistance = Settings.AimRadius
 
-    for i, Player in pairs(Players:GetPlayers()) do
-        if Player ~= LocalPlayer and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") and Player.Character:FindFirstChild("Humanoid").Health > 0 then
-            local TargetRootPart = Player.Character.HumanoidRootPart
-            local Distance = (LocalRootPart.Position - TargetRootPart.Position).Magnitude
-            if Distance < closestDistance and not Player.Character:FindFirstChild("ForceField") then
-                closestDistance = Distance
-                closestTarget = Player
+    local localRootPart = localPlayer.Character.HumanoidRootPart.Position
+
+    for _, player in Players:GetPlayers() do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local otherRootPart = player.Character.HumanoidRootPart.Position
+            local distanceSquared = (localRootPart - otherRootPart).Magnitude^2
+
+            if distanceSquared < minDistanceSquared then
+                minDistanceSquared = distanceSquared
+                nearestPlayer = player
             end
         end
     end
-    return closestTarget
+    return nearestPlayer
 end
 
-local function aimAtTarget(target)
-    local LocalPlayer = game:GetService("Players").LocalPlayer
-    if not LocalPlayer or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
-        return
-    end
-    local LocalRootPart = LocalPlayer.Character.HumanoidRootPart
-    local TargetRootPart = target.Character.HumanoidRootPart
-    local Camera = workspace.CurrentCamera
-
-    local targetScreenPosition = Camera:WorldToViewportPoint(TargetRootPart.Position)
-    local viewportSize = game:GetService("GuiService").GetGuiInset().Y
-
-    if targetScreenPosition then
-        local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, (Camera.ViewportSize.Y - viewportSize) / 2)
-        local delta = Vector2.new(targetScreenPosition.X, targetScreenPosition.Y) - screenCenter
-        local sensitivity = 0.01 -- Adjust for smoother aiming
-
-        mousemoverel(delta.X * sensitivity, delta.Y * sensitivity)
+local function lockCameraToPlayer(player)
+    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        camera.CameraType = Enum.CameraType.Scriptable
+        RunService.RenderStepped:Connect(function()
+            if isCameraLocked and lockedPlayer and lockedPlayer.Character and lockedPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local targetPosition = lockedPlayer.Character.HumanoidRootPart.Position
+                camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPosition)
+            end
+        end)
+    else
+        camera.CameraType = defaultCameraType
+        isCameraLocked = false
+        lockedPlayer = nil
+        -- Disconnect any existing RenderStepped connection (you might need to manage this better)
+        for i, connection in next, RunService:GetConnections("RenderStepped") do
+            connection:Disconnect()
+        end
     end
 end
 
-game:GetService("RunService").RenderStepped:Connect(function()
-    if Settings.Enabled then
-        local inputService = game:GetService("UserInputService")
-        local isKeyPressed = false
-        local key = Settings.AimKey
-
-        if key == "MouseButton1" then
-            isKeyPressed = inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
-        elseif key == "MouseButton2" then
-            isKeyPressed = inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+Tabs.AimbotTab:Toggle({
+    Title = "Lock camera to neariest player",
+    Default = false,
+    Callback = function(Value)
+        isCameraLocked = Value
+        if Value == true then
+            lockedPlayer = getNearestPlayer()
+            lockCameraToPlayer(lockedPlayer)
         else
-            isKeyPressed = inputService:IsKeyDown(Enum.KeyCode[key])
-        end
-
-        if isKeyPressed then
-            local target = getClosestPlayer()
-            if target then
-                aimAtTarget(target)
+            camera.CameraType = defaultCameraType
+            lockedPlayer = nil
+            -- Disconnect any existing RenderStepped connection (you might need to manage this better)
+            for i, connection in next, RunService:GetConnections("RenderStepped") do
+                connection:Disconnect()
             end
         end
     end
-end)
+})
 
 -- Вкладка "Настройки"
 Tabs.SettingsTab:Toggle({
