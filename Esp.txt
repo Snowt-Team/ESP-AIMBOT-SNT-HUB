@@ -356,43 +356,22 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 game:GetService("RunService").RenderStepped:Connect(function()
-    if nameTagsEnabled then
-        updateNameTags(nameTagsEnabled, false)
-    end
-end)
-
-local aimbotEnabled = false
-local aimbotTarget = nil
-local aimPart = "Head" -- Default aim part
-local aimSmoothness = 0.1 -- Adjust for smoother aiming (0 to 1)
-
-local function getClosestLivingEnemy()
-    local closest = nil
-    local minDist = math.huge
-    local localCharacter = localPlayer.Character
-    if not localCharacter or not localCharacter:FindFirstChild("HumanoidRootPart") then return nil end
-    local localHumanoid = localCharacter:FindFirstChildOfClass("Humanoid")
-    if not localHumanoid or localHumanoid.Health <= 0 then return nil end
-    local localRootPart = localCharacter:FindFirstChild("HumanoidRootPart")
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local targetCharacter = player.Character
-            local targetHumanoid = targetCharacter and targetCharacter:FindFirstChildOfClass("Humanoid")
-            local targetRootPart = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
-            local targetAimPart = targetCharacter and targetCharacter:FindFirstChild(aimPart)
-
-            if targetCharacter and targetHumanoid and targetRootPart and targetAimPart and targetHumanoid.Health > 0 and targetHumanoid.Sit == false and targetHumanoid.PlatformStand == false then
-                local dist = (localRootPart.Position - targetRootPart.Position).Magnitude
-                if dist < minDist then
-                    minDist = dist
-                    closest = player
-                end
+    if aimbotEnabled then
+        print("Aimbot is enabled") -- Check if this is firing every frame
+        if aimbotTarget and Players:FindFirstChild(aimbotTarget.Name) and aimbotTarget.Character and aimbotTarget.Character:FindFirstChild(aimPart) then
+            print("Aiming at target:", aimbotTarget.Name, "part:", aimPart)
+            aimAt(aimbotTarget, aimPart, aimSmoothness)
+        elseif not aimbotTarget then
+            local closestEnemy = getClosestLivingEnemy()
+            if closestEnemy and closestEnemy.Character and closestEnemy.Character:FindFirstChild(aimPart) then
+                print("Aiming at closest enemy:", closestEnemy.Name, "part:", aimPart)
+                aimAt(closestEnemy, aimPart, aimSmoothness)
+            else
+                print("No valid target to aim at")
             end
         end
     end
-    return closest
-end
+end)
 
 local function aimAt(target, partName, smoothness)
     local character = localPlayer.Character
@@ -407,7 +386,13 @@ local function aimAt(target, partName, smoothness)
             local desiredLookDirection = (targetPosition - rootPart.Position).Unit
             local newLookDirection = currentLookDirection:Lerp(desiredLookDirection, smoothness)
             local newRotation = CFrame.lookAt(rootPart.Position, rootPart.Position + newLookDirection)
-            rootPart.CFrame = newRotation * CFrame.new(0, rootPart.Size.Y / 2, 0) -- Maintain vertical position
+            print("Setting rootPart CFrame") -- Check if this line is reached
+            rootPart.CFrame = newRotation * CFrame.new(0, rootPart.Size.Y / 2, 0)
+            -- Add prints to check velocities or state changes if you suspect them
+            -- if humanoid:GetState() == Enum.HumanoidStateType.Jumping then
+            --     print("Humanoid state is Jumping!")
+            -- end
+            -- print("RootPart Velocity:", rootPart.Velocity)
         end
     end
 end
@@ -427,9 +412,10 @@ end)
 
 local aimbotDropdown = Tabs.AimbotTab:Dropdown({
     Title = "Игрок для аимбота",
-    Values = {"Нет"},
+    Values = {"Нет", playerNames},
     Value = "Нет",
-    Callback = function(playerName)
+    Callback = function(playerName) -- This is the Callback function
+        print("Selected player in dropdown:", playerName) -- For debugging
         if playerName == "Нет" then
             aimbotTarget = nil
         else
@@ -536,7 +522,6 @@ Tabs.SettingsTab:Toggle({
         end)
     end
 })
-
 Tabs.SettingsTab:Button({
     Title = "Переподключиться",
     Desc = "Переподключает к серверу",
