@@ -370,45 +370,6 @@ end)
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-
-local localPlayer = Players.LocalPlayer
-local camera = Workspace.CurrentCamera
-local overheadCameraEnabled = false
-local defaultCameraType = Enum.CameraType.Custom -- Or whatever the default is
-
--- Function to set the overhead camera view
-local function setOverheadCamera()
-    if localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local rootPart = localPlayer.Character.HumanoidRootPart
-        local overheadPosition = rootPart.Position + Vector3.new(0, 30, 0)
-        local lookAtPosition = rootPart.Position
-        camera.CameraType = Enum.CameraType.Scriptable
-        camera.CFrame = CFrame.lookAt(overheadPosition, lookAtPosition)
-    end
-end
-
--- Function to reset the camera to the default type
-local function resetCamera()
-    camera.CameraType = defaultCameraType
-end
-
--- The Toggle function (assuming 'Tabs.AimbotTab' is a UI element handler)
-
-Tabs.AimbotTab:Toggle({
-        Title = "Enable Overhead Camera",
-        Default = false,
-        Callback = function(Value)
-            overheadCameraEnabled = Value
-            if Value == true then
-                setOverheadCamera()
-            else
-                resetCamera()
-            end
-end})
-
-local UserInputService = game:GetService("UserInputService")
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
@@ -416,7 +377,7 @@ local localPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 local isCameraLocked = false
 local lockedPlayer = nil
-local defaultCameraType = Enum.CameraType.Custom -- Или ваш желаемый по умолчанию
+local defaultCameraType = Enum.CameraType.Custom
 
 -- Targeting Indicator (BillboardGui)
 local targetIndicator = Instance.new("BillboardGui")
@@ -427,9 +388,9 @@ targetIndicator.Enabled = false
 local arrow = Instance.new("ImageLabel")
 arrow.Size = UDim2.new(1, 0, 1, 0)
 arrow.BackgroundTransparency = 1
-arrow.Image = "rbxassetid://602361387" -- Замените на ID подходящей стрелки
-arrow.ImageColor3 = Color3.new(1, 1, 0) -- Желтый цвет
-arrow.Position = UDim2.new(0.5, 0, -1.5, 0) -- Позиция сверху
+arrow.Image = "rbxassetid://602361387"
+arrow.ImageColor3 = Color3.new(1, 1, 0)
+arrow.Position = UDim2.new(0.5, 0, -1.5, 0)
 arrow.AnchorPoint = Vector2.new(0.5, 0.5)
 arrow.Parent = targetIndicator
 
@@ -454,12 +415,12 @@ local function updateCameraLookAt()
         local targetPosition = lockedPlayer.Character.HumanoidRootPart.Position
         local desiredLookAt = targetPosition
 
-        local cameraOffset = Vector3.new(0, 2, 5) -- Настройте по желанию
+        local cameraOffset = Vector3.new(0, 2, 5)
         local lookAtCFrame = CFrame.lookAt(localRootPosition, desiredLookAt)
         local desiredCameraPosition = localRootPosition + lookAtCFrame:VectorToWorldSpace(cameraOffset)
 
         local tweenInfo = TweenInfo.new(
-            0.1, -- Длительность плавной анимации
+            0.1,
             Enum.EasingStyle.Linear,
             Enum.EasingDirection.Out,
             0,
@@ -470,7 +431,6 @@ local function updateCameraLookAt()
         local cameraTween = TweenService:Create(camera, tweenInfo, {CFrame = CFrame.lookAt(desiredCameraPosition, desiredLookAt)})
         cameraTween:Play()
 
-        -- Обновление индикатора цели
         targetIndicator.Adornee = lockedPlayer.Character.HumanoidRootPart
         targetIndicator.Enabled = true
     else
@@ -481,7 +441,7 @@ local function updateCameraLookAt()
 end
 
 local function getUpdatedPlayerList()
-    local dropdownValues = {"None"} -- Добавляем опцию "None"
+    local dropdownValues = {"None"}
     for _, player in Players:GetPlayers() do
         if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             table.insert(dropdownValues, player.Name)
@@ -491,19 +451,8 @@ local function getUpdatedPlayerList()
     return dropdownValues
 end
 
--- Функция для обновления значений дропдауна (предполагается, что у вас есть доступ к UI элементу дропдауна)
-local function updateDropdownValues()
-    local newValues = getUpdatedPlayerList()
-    -- В зависимости от вашей UI библиотеки, вам нужно будет обновить
-    -- свойство Values дропдауна здесь.
-    -- Пример (может отличаться):
-    if Tabs and Tabs.AimbotTab and Tabs.AimbotTab.DropdownElement then
-        Tabs.AimbotTab.DropdownElement.Values = newValues
-        print("Updating dropdown values:", newValues) -- Заглушка для демонстрации
-    else
-        warn("Ошибка: Не удалось найти элемент Dropdown для обновления.")
-    end
-end
+-- Предполагаем, что Tabs.AimbotTab.DropdownElement содержит ссылку на объект Dropdown Wind UI
+local dropdownElement
 
 Tabs.AimbotTab:Toggle({
     Title = "Lock camera to target",
@@ -513,17 +462,17 @@ Tabs.AimbotTab:Toggle({
         if Value == true then
             camera.CameraType = Enum.CameraType.Scriptable
             RunService.RenderStepped:Connect(updateCameraLookAt)
-            updateDropdownValues() -- Обновляем список при включении
-            if Tabs and Tabs.AimbotTab and Tabs.AimbotTab.DropdownElement then
-                local currentValue = Tabs.AimbotTab.DropdownElement.Value
-                lockedPlayer = getPlayerByName(currentValue) -- Восстанавливаем заблокированного игрока, если он еще есть
+            if dropdownElement then
+                dropdownElement:Set("Values", getUpdatedPlayerList())
+            end
+            if dropdownElement then
+                lockedPlayer = getPlayerByName(dropdownElement.Value)
             end
         else
             camera.CameraType = defaultCameraType
             lockedPlayer = nil
             targetIndicator.Enabled = false
-            -- Отключение RenderStepped соединения
-          for _, connection in pairs(RunService:GetConnections("RenderStepped")) do
+            for _, connection in pairs(RunService:GetConnections("RenderStepped")) do
                 if connection.Function == updateCameraLookAt then
                     connection:Disconnect()
                     break
@@ -533,9 +482,9 @@ Tabs.AimbotTab:Toggle({
     end
 })
 
-Tabs.AimbotTab:Dropdown({
+dropdownElement = Tabs.AimbotTab:Dropdown({
     Title = "Change locked player",
-    Values = getUpdatedPlayerList(), -- Изначальный список
+    Values = getUpdatedPlayerList(),
     Value = "None",
     Callback = function(selectedPlayerName)
         lockedPlayer = getPlayerByName(selectedPlayerName)
@@ -544,31 +493,28 @@ Tabs.AimbotTab:Dropdown({
         elseif isCameraLocked then
             print("Camera lock disabled.")
         end
-    end,
-    -- Предполагаем, что у вас есть способ сохранить ссылку на элемент дропдауна
-    -- чтобы можно было обновлять его Values извне Callback'а.
-    -- Пример (может отличаться):
-    DropdownElement = self
+    end
 })
 
 Tabs.AimbotTab:Button({
     Title = "Update Player List",
     Callback = function()
-        updateDropdownValues()
+        if dropdownElement then
+            dropdownElement:Set("Values", getUpdatedPlayerList())
+        end
     end
 })
 
--- Обновление списка игроков при их добавлении или удалении (попытка автоматизации)
 Players.PlayerAdded:Connect(function(player)
-    if isCameraLocked then -- Обновляем список только если камера заблокирована
-        wait(0.5) -- Небольшая задержка, чтобы игрок полностью загрузился
-        updateDropdownValues()
+    if isCameraLocked and dropdownElement then
+        task.wait(0.5)
+        dropdownElement:Set("Values", getUpdatedPlayerList())
     end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
-    if isCameraLocked then -- Обновляем список только если камера заблокирована
-        updateDropdownValues()
+    if isCameraLocked and dropdownElement then
+        dropdownElement:Set("Values", getUpdatedPlayerList())
         if lockedPlayer == player then
             lockedPlayer = nil
             camera.CameraType = defaultCameraType
