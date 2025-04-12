@@ -1,0 +1,546 @@
+local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+
+local Window = WindUI:CreateWindow({
+    Title = "Универсальный ESP/AIMBOT | SNT HUB",
+    Icon = "eye",
+    Author = "SnOwT",
+    Folder = "SNT Hub",
+    Size = UDim2.fromOffset(440, 320),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 200,
+    HasOutline = true,
+    KeySystem = {
+        Key = { "SnowtTest", "SnowtRelease" },
+        Note = "Введите ключ. Чтобы получить ключ, нажмите на кнопку 'Get Key' и отправьте мне сообщение.",
+        URL = "t.me/supreme_sigma",
+        SaveKey = false,
+    },
+})
+
+Window:EditOpenButton({
+    Title = "Открыть UI",
+    Icon = "monitor",
+    CornerRadius = UDim.new(0, 10),
+    StrokeThickness = 2,
+    Color = ColorSequence.new(
+        Color3.fromHex("FF0F7B"),
+        Color3.fromHex("F89B29")
+    ),
+    Draggable = true,
+})
+
+local Tabs = {
+    CharacterTab = Window:Tab({ Title = "Персонаж", Icon = "file-cog", Desc = "Изменение настроек вашего персонажа." }),
+    EspTab = Window:Tab({ Title = "ESP", Icon = "eye", Desc = "Позволяет видеть больше чем обычно." }),
+    SettingsTab = Window:Tab({ Title = "Настройки", Icon = "battery", Desc = "Различные настройки скрипта." }),
+    AimbotTab = Window:Tab({ Title = "Аимбот", Icon = "axe", Desc = "Автонаводка на врагов"
+    })
+}
+
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+local function isNumber(str)
+    return tonumber(str) ~= nil or str == 'inf'
+end
+
+getgenv().HitboxSize = 15
+getgenv().HitboxTransparency = 0.9
+getgenv().HitboxStatus = false
+getgenv().TeamCheck = false
+getgenv().Walkspeed = localPlayer.Character and localPlayer.Character.Humanoid.WalkSpeed or 16
+getgenv().Jumppower = localPlayer.Character and localPlayer.Character.Humanoid.JumpPower or 50
+getgenv().TPSpeed = 3
+getgenv().TPWalk = false
+getgenv().InfJ = false
+
+local espColor = Color3.fromRGB(255, 0, 0)
+local espTransparency = 0.5
+local Highlight
+
+Window:SelectTab(1)
+
+-- Вкладка "Персонаж"
+Tabs.CharacterTab:Input({
+    Title = "Изменить скорость ходьбы",
+    Default = tostring(getgenv().Walkspeed),
+    Placeholder = "Введите скорость ходьбы:",
+    Callback = function(input)
+        if isNumber(input) then
+            getgenv().Walkspeed = tonumber(input)
+            if localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                localPlayer.Character.Humanoid.WalkSpeed = getgenv().Walkspeed
+            end
+        end
+    end,
+})
+
+Tabs.CharacterTab:Input({
+    Title = "Изменить силу прыжка",
+    Default = tostring(getgenv().Jumppower),
+    Placeholder = "Введите силу прыжка:",
+    Callback = function(input)
+        if isNumber(input) then
+            getgenv().Jumppower = tonumber(input)
+             if localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                localPlayer.Character.Humanoid.JumpPower = getgenv().Jumppower
+             end
+        end
+    end,
+})
+
+Tabs.CharacterTab:Toggle({
+    Title = "Изменить хитбокс",
+    Default = false,
+    Callback = function(state)
+        getgenv().HitboxStatus = state
+        game:GetService('RunService').RenderStepped:Connect(function()
+            if localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                if getgenv().HitboxStatus and getgenv().TeamCheck == false then
+                    for _, player in pairs(Players:GetPlayers()) do
+                        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            pcall(function()
+                                player.Character.HumanoidRootPart.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
+                                player.Character.HumanoidRootPart.Transparency = getgenv().HitboxTransparency
+                                player.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really black")
+                                player.Character.HumanoidRootPart.Material = "Neon"
+                                player.Character.HumanoidRootPart.CanCollide = false
+                            end)
+                        end
+                    end
+                elseif getgenv().HitboxStatus and getgenv().TeamCheck == true then
+                    for _, player in pairs(Players:GetPlayers()) do
+                        if localPlayer.Team ~= player.Team and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            pcall(function()
+                                player.Character.HumanoidRootPart.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
+                                player.Character.HumanoidRootPart.Transparency = getgenv().HitboxTransparency
+                                player.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really black")
+                                player.Character.HumanoidRootPart.Material = "Neon"
+                                player.Character.HumanoidRootPart.CanCollide = false
+                            end)
+                        end
+                    end
+                else
+                    for _, player in pairs(Players:GetPlayers()) do
+                        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            pcall(function()
+                                player.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 1)
+                                player.Character.HumanoidRootPart.Transparency = 1
+                                player.Character.HumanoidRootPart.BrickColor = BrickColor.new("Medium stone grey")
+                                player.Character.HumanoidRootPart.Material = "Plastic"
+                                player.Character.HumanoidRootPart.CanCollide = false
+                            end)
+                        end
+                    end
+                end
+            end
+        end)
+    end,
+})
+
+Tabs.CharacterTab:Input({
+    Title = "Размер хитбокса",
+    Default = tostring(getgenv().HitboxSize),
+    Placeholder = "Введите размер хитбокса:",
+    Callback = function(input)
+        if isNumber(input) then
+            getgenv().HitboxSize = tonumber(input)
+        end
+    end,
+})
+
+-- Вкладка "ESP"
+local espNameTags = {}
+
+local function createNameTag(targetPlayer)
+    local character = targetPlayer.Character or targetPlayer.CharacterAdded:Wait()
+    if not character then return end
+
+    local head = character:WaitForChild("Head")
+    if not head then return end
+
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Name = "NameEsp"
+    billboardGui.Adornee = head
+    billboardGui.AlwaysOnTop = true
+    billboardGui.Size = UDim2.new(0, 100, 0, 20)
+    billboardGui.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = targetPlayer.Name
+    textLabel.TextColor3 = Color3.new(1, 1, 1)
+    textLabel.TextScaled = true
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    textLabel.TextStrokeTransparency = 0
+    textLabel.TextSize = 14
+    textLabel.Parent = billboardGui
+
+    billboardGui.Parent = character
+    espNameTags[targetPlayer] = billboardGui
+end
+local function removeNameTag(targetPlayer)
+    if espNameTags and espNameTags[targetPlayer] then
+        pcall(function()
+            espNameTags[targetPlayer]:Destroy()
+        end)
+        espNameTags[targetPlayer] = nil
+    end
+end
+
+local function updateNameTags(enabled, useTeamColor)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local character = player.Character
+            if character and character:FindFirstChild("Head") then
+                if enabled then
+                    if not espNameTags or not espNameTags[player] then
+                        createNameTag(player) -- Assuming createNameTag is defined elsewhere
+                    end
+                     local textColor = Color3.new(1,1,1)
+                    if useTeamColor then
+                         textColor = (player.TeamColor == localPlayer.TeamColor) and Color3.new(0, 255, 0) or Color3.new(255,255,255)
+                    end
+                    local nametag = espNameTags and espNameTags[player]
+                    if nametag then
+                        local textLabel = nametag:FindFirstChild("TextLabel")
+                        if textLabel then
+                            textLabel.TextColor3 = textColor
+                        end
+                    end
+                else
+                    removeNameTag(player)
+                end
+            end
+        end
+    end
+end
+
+Tabs.EspTab:Toggle({
+    Title = "ESP игроков",
+    Default = false,
+    Callback = function(tog)
+        _G.espits = tog
+        for i, v in pairs(game.Workspace:GetDescendants()) do
+            if v:IsA("Model") and v:FindFirstChild("Humanoid") then
+                local highlight = v:FindFirstChild("Highlight")
+                if tog then
+                    if not highlight then
+                        Highlight = Instance.new("Highlight", v)
+                        Highlight.FillColor = espColor or Color3.fromRGB(255, 0, 0)
+                        Highlight.FillTransparency = espTransparency or 0.5
+                    else
+                        highlight.FillColor = espColor or Color3.fromRGB(255, 0, 0)
+                        highlight.FillTransparency = espTransparency or 0.5
+                    end
+                else
+                    if highlight then
+                        highlight:Destroy()
+                    end
+                end
+            end
+        end
+    end,
+})
+
+Tabs.EspTab:Dropdown({
+    Title = "Цвет ESP",
+    Values = { "Green", "Red", "Blue", "Yellow", "Pink", "Purple" },
+    Value = "Red",
+    Callback = function(option)
+        if option == "Green" then
+            espColor = Color3.fromRGB(0, 255, 0)
+        elseif option == "Red" then
+            espColor = Color3.fromRGB(255, 0, 0)
+        elseif option == "Blue" then
+            espColor = Color3.fromRGB(0, 0, 255)
+        elseif option == "Yellow" then
+            espColor = Color3.fromRGB(255, 255, 0)
+        elseif option == "Pink" then
+            espColor = Color3.fromRGB(239, 14, 216)
+        elseif option == "Purple" then
+            espColor = Color3.fromRGB(180, 14, 240)
+        end
+        if _G.espits then
+            for i, v in pairs(game.Workspace:GetDescendants()) do
+                if v:IsA("Model") and v:FindFirstChild("Humanoid") then
+                    local highlight = v:FindFirstChild("Highlight")
+                    if highlight then
+                        highlight.FillColor = espColor
+                    end
+                end
+            end
+        end
+    end,
+})
+
+Tabs.EspTab:Input({
+    Title = "Прозрачность ESP",
+    Default = "0.5",
+    Placeholder = "Введите прозрачность",
+    Callback = function(input)
+        local value = tonumber(input)
+        if typeof(value) == "number" then
+            espTransparency = math.clamp(value, 0, 1)
+            if Highlight then
+                Highlight.FillTransparency = espTransparency
+            end
+            if _G.espits then
+                for i, v in pairs(game.Workspace:GetDescendants()) do
+                    if v:IsA("Model") and v:FindFirstChild("Humanoid") then
+                        local highlight = v:FindFirstChild("Highlight")
+                        if highlight then
+                            highlight.FillTransparency = espTransparency
+                        end
+                    end
+                end
+            end
+        end
+    end,
+})
+
+Tabs.EspTab:Toggle({
+    Title = "ESP имена игроков",
+    Default = false,
+    Callback = function(enabled)
+        nameTagsEnabled = enabled -- Assuming nameTagsEnabled is a global variable
+        updateNameTags(enabled, false)
+    end,
+})
+
+Tabs.EspTab:Toggle({
+    Title = "ESP команд",
+    Default = false,
+    Callback = function(Tesp)
+        updateNameTags(Tesp, true)
+    end
+})
+
+-- Обновление ESP при добавлении/удалении игрока и загрузке чанка
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        wait(0.5)
+        if _G.espits then
+            for i, v in pairs(game.Workspace:GetDescendants()) do
+                if v:IsA("Model") and v:FindFirstChild("Humanoid") then
+                    local highlight = v:FindFirstChild("Highlight")
+                    if not highlight then
+                        Highlight = Instance.new("Highlight", v)
+                        Highlight.FillColor = espColor or Color3.fromRGB(255, 0, 0)
+                        Highlight.FillTransparency = espTransparency or 0.5
+                    else
+                        highlight.FillColor = espColor or Color3.fromRGB(255, 0, 0)
+                        highlight.FillTransparency = espTransparency or 0.5
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    removeNameTag(player)
+    if _G.espits then
+        for i, v in pairs(game.Workspace:GetDescendants()) do
+            if v:IsA("Model") and v:FindFirstChild("Humanoid") then
+                local highlight = v:FindFirstChild("Highlight")
+                if highlight then
+                    highlight:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if nameTagsEnabled then
+        updateNameTags(nameTagsEnabled, false)
+    end
+end)
+
+local aimbotEnabled = false
+local aimbotTarget = nil
+local aimPart = "Head" -- Default aim part
+local aimSmoothness = 0.1 -- Adjust for smoother aiming (0 to 1)
+
+local function getClosestLivingEnemy()
+    local closest = nil
+    local minDist = math.huge
+    local localCharacter = localPlayer.Character
+    if not localCharacter or not localCharacter:FindFirstChild("HumanoidRootPart") then return nil end
+    local localHumanoid = localCharacter:FindFirstChildOfClass("Humanoid")
+    if not localHumanoid or localHumanoid.Health <= 0 then return nil end
+    local localRootPart = localCharacter:FindFirstChild("HumanoidRootPart")
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local targetCharacter = player.Character
+            local targetHumanoid = targetCharacter and targetCharacter:FindFirstChildOfClass("Humanoid")
+            local targetRootPart = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
+            local targetAimPart = targetCharacter and targetCharacter:FindFirstChild(aimPart)
+
+            if targetCharacter and targetHumanoid and targetRootPart and targetAimPart and targetHumanoid.Health > 0 and targetHumanoid.Sit == false and targetHumanoid.PlatformStand == false then
+                local dist = (localRootPart.Position - targetRootPart.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    closest = player
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function aimAt(target, partName, smoothness)
+    local character = localPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+
+    if character and humanoid and rootPart and target and target.Character then
+        local targetPart = target.Character:FindFirstChild(partName)
+        if targetPart then
+            local targetPosition = targetPart.Position
+            local currentLookDirection = rootPart.CFrame.LookVector
+            local desiredLookDirection = (targetPosition - rootPart.Position).Unit
+            local newLookDirection = currentLookDirection:Lerp(desiredLookDirection, smoothness)
+            local newRotation = CFrame.lookAt(rootPart.Position, rootPart.Position + newLookDirection)
+            rootPart.CFrame = newRotation * CFrame.new(0, rootPart.Size.Y / 2, 0) -- Maintain vertical position
+        end
+    end
+end
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if aimbotEnabled then
+        if aimbotTarget and Players:FindFirstChild(aimbotTarget.Name) and aimbotTarget.Character and aimbotTarget.Character:FindFirstChild(aimPart) then
+            aimAt(aimbotTarget, aimPart, aimSmoothness)
+        elseif not aimbotTarget then
+            local closestEnemy = getClosestLivingEnemy()
+            if closestEnemy and closestEnemy.Character and closestEnemy.Character:FindFirstChild(aimPart) then
+                aimAt(closestEnemy, aimPart, aimSmoothness)
+            end
+        end
+    end
+end)
+
+local aimbotDropdown = Tabs.AimbotTab:Dropdown({
+    Title = "Игрок для аимбота",
+    Values = {"Нет"},
+    Value = "Нет",
+    Callback = function(playerName)
+        if playerName == "Нет" then
+            aimbotTarget = nil
+        else
+            aimbotTarget = Players:FindFirstChild(playerName)
+        end
+    end
+})
+
+local function updateAimbotDropdown()
+    local playerNames = {"Нет"}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            table.insert(playerNames, player.Name)
+        end
+    end
+    aimbotDropdown:SetValues(playerNames)
+end
+
+Players.PlayerAdded:Connect(updateAimbotDropdown)
+Players.PlayerRemoving:Connect(updateAimbotDropdown)
+
+Tabs.AimbotTab:Toggle({
+    Title = "Аимбот ближайших врагов",
+    Default = false,
+    Callback = function(Aim)
+        aimbotEnabled = Aim
+        if Aim then
+            aimbotTarget = nil
+            updateAimbotDropdown() -- Ensure dropdown is updated when enabling closest enemy aimbot
+        end
+    end
+})
+
+Tabs.AimbotTab:Toggle({
+    Title = "Аимбот на выбранного игрока",
+    Default = false,
+    Callback = function(AimB)
+        aimbotEnabled = AimB
+        if not AimB then
+            aimbotTarget = nil
+            aimbotDropdown:SetValue("Нет")
+        else
+            updateAimbotDropdown() -- Ensure dropdown is updated when enabling targeted aimbot
+        end
+    end
+})
+
+Tabs.AimbotTab:Dropdown({
+    Title = "Часть тела для аима",
+    Values = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"},
+    Value = "Head",
+    Callback = function(part)
+        aimPart = part
+    end
+})
+
+Tabs.AimbotTab:Slider({
+    Title = "Сглаживание аима",
+    Min = 0,
+    Max = 1,
+    Default = 0.1,
+    Step = 0.01,
+    Callback = function(value)
+        aimSmoothness = value
+    end
+})
+
+-- Вкладка "Настройки"
+Tabs.SettingsTab:Toggle({
+    Title = "Включить/Выключить NoClip",
+    Default = false,
+    Callback = function(Noclip)
+        if Noclip then
+            getgenv().Clip = false
+            if localPlayer.Character then
+                for _, v in pairs(localPlayer.Character:GetDescendants()) do
+                    if v:IsA('BasePart') and v.CanCollide and v.Name ~= "HumanoidRootPart" then
+                        v.CanCollide = false
+                    end
+                end
+            end
+        else
+            getgenv().Clip = true
+            if localPlayer.Character then
+                for _, v in pairs(localPlayer.Character:GetDescendants()) do
+                    if v:IsA('BasePart') and not v:IsA("Accessory") and v.Name ~= "HumanoidRootPart" then
+                        v.CanCollide = true
+                    end
+                end
+            end
+        end
+    end
+})
+
+Tabs.SettingsTab:Toggle({
+    Title = "Бесконечный прыжок",
+    Default = false,
+    Callback = function(s)
+        getgenv().InfJ = s
+        game:GetService("UserInputService").JumpRequest:Connect(function()
+            if getgenv().InfJ and localPlayer.Character and localPlayer.Character:FindFirstChildOfClass'Humanoid' then
+                localPlayer.Character:FindFirstChildOfClass'Humanoid':ChangeState("Jumping")
+            end
+        end)
+    end
+})
+
+Tabs.SettingsTab:Button({
+    Title = "Переподключиться",
+    Desc = "Переподключает к серверу",
+    Callback = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, localPlayer)
+    end
+})
