@@ -410,78 +410,151 @@ local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local localPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 local isCameraLocked = false
+local lockedPlayer = nil
 local defaultCameraType = Enum.CameraType.Custom -- Or your desired default
+local playerList = {}
+local currentPlayerIndex = 0
+local canChangeTarget = true
+local changeTargetDebounceTime = 0.5 -- Seconds
 
-local function getNearestOtherPlayer()
-    local nearestPlayer = nil
-    local minDistanceSquared = math.huge
+-- Targeting Indicator (BillboardGui)
+local targetIndicator = Instance.new("BillboardGui")
+targetIndicator.Size = UDim2.new(2, 0, 1, 0)
+targetIndicator.AlwaysOnTop = true
+targetIndicator.Enabled = false
 
-    if not localPlayer or not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        return nil
-    end
+local arrow = Instance.new("ImageLabel")
+arrow.Size = UDim2.new(1, 0, 1, 0)
+arrow.BackgroundTransparency = 1
+arrow.Image = "rbxassetid://602361387" -- Replace with a suitable arrow image ID
+arrow.ImageColor3 = Color3.new(1, 1, 0) -- Yellow color
+arrow.Position = UDim2.new(0.5, 0, -1.5, 0) -- Position above
+arrow.AnchorPoint = Vector2.new(0.5, 0.5)
+arrow.Parent = targetIndicator
 
-    local localRootPart = localPlayer.Character.HumanoidRootPart.Position
+targetIndicator.Parent = Workspace
 
+local function updatePlayerList()
+    playerList = {}
     for _, player in Players:GetPlayers() do
         if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local otherRootPart = player.Character.HumanoidRootPart.Position
-            local distanceSquared = (localRootPart - otherRootPart).Magnitude^2
-
-            if distanceSquared < minDistanceSquared then
-                minDistanceSquared = distanceSquared
-                nearestPlayer = player
-            end
+            table.insert(playerList, player)
         end
     end
-    return nearestPlayer
+    table.sort(playerList, function(a, b) -- Sort by distance for potentially better initial target
+        if localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local distA = (a.Character.HumanoidRootPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+            local distB = (b.Character.HumanoidRootPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+            return distA < distB
+        else
+            return false
+        end
+    end)
+    -- Ensure the index is within bounds
+    if #playerList > 0 and currentPlayerIndex > #playerList then
+        currentPlayerIndex = 1
+    elseif #playerList == 0 then
+        lockedPlayer = nil
+    end
+end
+
+local function getNextPlayer()
+    updatePlayerList()
+    if #playerList > 0 then
+        currentPlayerIndex = currentPlayerIndex % #playerList + 1
+        return playerList[currentPlayerIndex]
+    else
+        return nil
+    end
 end
 
 local function updateCameraLookAt()
-    if isCameraLocked and localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local nearestOther = getNearestOtherPlayer()
-        if nearestOther and nearestOther.Character and nearestOther.Character:FindFirstChild("HumanoidRootPart") then
-            camera.CameraType = Enum.CameraType.Scriptable
-            local localRootPosition = localPlayer.Character.HumanoidRootPart.Position
-            local targetPosition = nearestOther.Character.HumanoidRootPart.Position
+    if isCameraLocked and localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") and lockedPlayer and lockedPlayer.Character and lockedPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local localRootPosition = localPlayer.Character.HumanoidRootPart.Position
+        local targetPosition = lockedPlayer.Character.HumanoidRootPart.Position
+        local desiredLookAt = targetPosition
 
-            -- Calculate the desired camera position behind the player
-            local cameraOffset = Vector3.new(0, 2, 5) -- Adjust these values as needed
-            local lookAtCFrame = CFrame.lookAt(localRootPosition, targetPosition)
-            local desiredCameraPosition = localRootPosition + lookAtCFrame:VectorToWorldSpace(cameraOffset)
+        local cameraOffset = Vector3.new(0, 2, 5) -- Adjust as needed
+        local lookAtCFrame = CFrame.lookAt(localRootPosition, desiredLookAt)
+        local desiredCameraPosition = localRootPosition + lookAtCFrame:VectorToWorldSpace(cameraOffset)
 
-            camera.CFrame = CFrame.lookAt(desiredCameraPosition, targetPosition)
-        else
-            camera.CameraType = defaultCameraType
-            isCameraLocked = false
-        end
-    elseif not isCameraLocked then
+        local tweenInfo = TweenInfo.new(
+            0.1, -- Duration for smooth transition
+            Enum.EasingStyle.Linear,
+            Enum.EasingDirection.Out,
+            0,
+            false,
+            0
+        )
+
+        local cameraTween = TweenService:Create(camera, tweenInfo, {CFrame = CFrame.lookAt(desiredCameraPosition, desiredLookAt)})
+        cameraTween:Play()
+
+        -- Update target indicator
+        targetIndicator.Adornee = lockedPlayer.Character.HumanoidRootPart
+        targetIndicator.Enabled = true
+    else
         camera.CameraType = defaultCameraType
+        lockedPlayer = nil
+        targetIndicator.Enabled = false
     end
 end
 
 Tabs.AimbotTab:Toggle({
-    Title = "Lock camera to nearest player (Follow + LookAt)",
+    Title = "Lock camera to target",
     Default = false,
     Callback = function(Value)
         isCameraLocked = Value
         if Value == true then
-            RunService.RenderStepped:Connect(updateCameraLookAt)
+            updatePlayerList()
+            lockedPlayer = playerList[1] -- Start with the first available player
+            if lockedPlayer then
+                camera.CameraType = Enum.CameraType.Scriptable
+                RunService.RenderStepped:Connect(updateCameraLookAt)
+            else
+                camera.CameraType = defaultCameraType
+                isCameraLocked = false
+                targetIndicator.Enabled = false
+            end
         else
             camera.CameraType = defaultCameraType
+            lockedPlayer = nil
+            targetIndicator.Enabled = false
             -- Disconnect the RenderStepped connection
             for _, connection in pairs(RunService:GetConnections("RenderStepped")) do
                 if connection.Function == updateCameraLookAt then
                     connection:Disconnect()
-                    break -- Assuming only one such connection
+                    break
                 end
             end
         end
     end
 })
+
+Tabs.AimbotTab:Button({
+    Title = "Change locked player",
+    Callback = function()
+        if isCameraLocked and canChangeTarget then
+            canChangeTarget = false
+            lockedPlayer = getNextPlayer()
+            if not lockedPlayer then
+                print("No other players to lock onto.")
+                targetIndicator.Enabled = false
+            end
+            wait(changeTargetDebounceTime)
+            canChangeTarget = true
+        end
+    end
+})
+
+-- Update player list whenever a player joins or leaves
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
 
 -- Вкладка "Настройки"
 Tabs.SettingsTab:Toggle({
