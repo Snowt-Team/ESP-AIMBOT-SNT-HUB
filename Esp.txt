@@ -414,10 +414,9 @@ local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 local isCameraLocked = false
-local lockedPlayer = nil
 local defaultCameraType = Enum.CameraType.Custom -- Or your desired default
 
-local function getNearestPlayer()
+local function getNearestOtherPlayer()
     local nearestPlayer = nil
     local minDistanceSquared = math.huge
 
@@ -441,40 +440,44 @@ local function getNearestPlayer()
     return nearestPlayer
 end
 
-local function lockCameraToPlayer(player)
-    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        camera.CameraType = Enum.CameraType.Scriptable
-        RunService.RenderStepped:Connect(function()
-            if isCameraLocked and lockedPlayer and lockedPlayer.Character and lockedPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local targetPosition = lockedPlayer.Character.HumanoidRootPart.Position
-                camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPosition)
-            end
-        end)
-    else
-        camera.CameraType = defaultCameraType
-        isCameraLocked = false
-        lockedPlayer = nil
-        -- Disconnect any existing RenderStepped connection (you might need to manage this better)
-        for i, connection in next, RunService:GetConnections("RenderStepped") do
-            connection:Disconnect()
+local function updateCameraLookAt()
+    if isCameraLocked and localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local nearestOther = getNearestOtherPlayer()
+        if nearestOther and nearestOther.Character and nearestOther.Character:FindFirstChild("HumanoidRootPart") then
+            camera.CameraType = Enum.CameraType.Scriptable
+            local localRootPosition = localPlayer.Character.HumanoidRootPart.Position
+            local targetPosition = nearestOther.Character.HumanoidRootPart.Position
+
+            -- Calculate the desired camera position behind the player
+            local cameraOffset = Vector3.new(0, 2, 5) -- Adjust these values as needed
+            local lookAtCFrame = CFrame.lookAt(localRootPosition, targetPosition)
+            local desiredCameraPosition = localRootPosition + lookAtCFrame:VectorToWorldSpace(cameraOffset)
+
+            camera.CFrame = CFrame.lookAt(desiredCameraPosition, targetPosition)
+        else
+            camera.CameraType = defaultCameraType
+            isCameraLocked = false
         end
+    elseif not isCameraLocked then
+        camera.CameraType = defaultCameraType
     end
 end
 
 Tabs.AimbotTab:Toggle({
-    Title = "Lock camera to neariest player",
+    Title = "Lock camera to nearest player (Follow + LookAt)",
     Default = false,
     Callback = function(Value)
         isCameraLocked = Value
         if Value == true then
-            lockedPlayer = getNearestPlayer()
-            lockCameraToPlayer(lockedPlayer)
+            RunService.RenderStepped:Connect(updateCameraLookAt)
         else
             camera.CameraType = defaultCameraType
-            lockedPlayer = nil
-            -- Disconnect any existing RenderStepped connection (you might need to manage this better)
-            for i, connection in next, RunService:GetConnections("RenderStepped") do
-                connection:Disconnect()
+            -- Disconnect the RenderStepped connection
+            for _, connection in pairs(RunService:GetConnections("RenderStepped")) do
+                if connection.Function == updateCameraLookAt then
+                    connection:Disconnect()
+                    break -- Assuming only one such connection
+                end
             end
         end
     end
