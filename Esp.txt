@@ -38,6 +38,17 @@ local Tabs = {
     })
 }
 
+local Settings = {
+    Enabled = false,
+    AimKey = "RightShift",
+    AimRadius = 100,
+    PredictionFactor = 0.1,
+    SmoothingFactor = 0.1,
+    TargetPart = "Head",
+    OnlyVisible = true,
+    TeamCheck = false,
+}
+
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
 
@@ -355,132 +366,117 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
+
+
+Settings.Enabled = AimbotTab:Toggle({
+    Title = "Enable Aimbot",
+    Default = false,
+    Callback = function(state)
+        Settings.Enabled = state
+    end
+})
+
+Settings.AimKey = AimbotTab:Dropdown({
+    Title = "Activation Key",
+    Values = {"LeftShift", "RightShift", "E", "Q", "MouseButton1", "MouseButton2"},
+    Value = "RightShift",
+    Callback = function(key)
+        Settings.AimKey = key
+    end
+})
+
+Settings.AimRadius = AimbotTab:Slider({
+    Title = "Aim Radius",
+    Value = {
+        Min = 10,
+        Max = 200,
+        Default = 50,
+    },
+    Callback = function(radius)
+        Settings.AimRadius = radius
+    end
+})
+
+Settings.Prediction = AimbotTab:Toggle({
+    Title = "Enable Prediction",
+    Default = false,
+    Callback = function(state)
+        Settings.Prediction = state
+    end
+})
+
+local function getClosestPlayer()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    if not LocalPlayer or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return nil
+    end
+    local LocalRootPart = LocalPlayer.Character.HumanoidRootPart
+    local closestTarget = nil
+    local closestDistance = Settings.AimRadius
+
+    for i, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") and Player.Character:FindFirstChild("Humanoid").Health > 0 then
+            local TargetRootPart = Player.Character.HumanoidRootPart
+            local Distance = (LocalRootPart.Position - TargetRootPart.Position).Magnitude
+            if Distance < closestDistance and not Player.Character:FindFirstChild("ForceField") then
+                closestDistance = Distance
+                closestTarget = Player
+            end
+        end
+    end
+    return closestTarget
+end
+
+local function aimAtTarget(target)
+    local LocalPlayer = game:GetService("Players").LocalPlayer
+    if not LocalPlayer or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    local LocalRootPart = LocalPlayer.Character.HumanoidRootPart
+    local TargetRootPart = target.Character.HumanoidRootPart
+    local Camera = workspace.CurrentCamera
+
+    local targetScreenPosition = Camera:WorldToViewportPoint(TargetRootPart.Position)
+    local viewportSize = game:GetService("GuiService").GetGuiInset().Y
+
+    if targetScreenPosition then
+        local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, (Camera.ViewportSize.Y - viewportSize) / 2)
+        local delta = Vector2.new(targetScreenPosition.X, targetScreenPosition.Y) - screenCenter
+        local sensitivity = 0.01 -- Adjust for smoother aiming
+
+        mousemoverel(delta.X * sensitivity, delta.Y * sensitivity)
+    end
+end
+
 game:GetService("RunService").RenderStepped:Connect(function()
-    if aimbotEnabled then
-        print("Aimbot is enabled") -- Check if this is firing every frame
-        if aimbotTarget and Players:FindFirstChild(aimbotTarget.Name) and aimbotTarget.Character and aimbotTarget.Character:FindFirstChild(aimPart) then
-            print("Aiming at target:", aimbotTarget.Name, "part:", aimPart)
-            aimAt(aimbotTarget, aimPart, aimSmoothness)
-        elseif not aimbotTarget then
-            local closestEnemy = getClosestLivingEnemy()
-            if closestEnemy and closestEnemy.Character and closestEnemy.Character:FindFirstChild(aimPart) then
-                print("Aiming at closest enemy:", closestEnemy.Name, "part:", aimPart)
-                aimAt(closestEnemy, aimPart, aimSmoothness)
-            else
-                print("No valid target to aim at")
+    if Settings.Enabled then
+        local inputService = game:GetService("UserInputService")
+        local isKeyPressed = false
+        local key = Settings.AimKey
+
+        if key == "MouseButton1" then
+            isKeyPressed = inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+        elseif key == "MouseButton2" then
+            isKeyPressed = inputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+        else
+            isKeyPressed = inputService:IsKeyDown(Enum.KeyCode[key])
+        end
+
+        if isKeyPressed then
+            local target = getClosestPlayer()
+            if target then
+                aimAtTarget(target)
             end
         end
     end
 end)
 
-local function aimAt(target, partName, smoothness)
-    local character = localPlayer.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-
-    if character and humanoid and rootPart and target and target.Character then
-        local targetPart = target.Character:FindFirstChild(partName)
-        if targetPart then
-            local targetPosition = targetPart.Position
-            local currentLookDirection = rootPart.CFrame.LookVector
-            local desiredLookDirection = (targetPosition - rootPart.Position).Unit
-            local newLookDirection = currentLookDirection:Lerp(desiredLookDirection, smoothness)
-            local newRotation = CFrame.lookAt(rootPart.Position, rootPart.Position + newLookDirection)
-            print("Setting rootPart CFrame") -- Check if this line is reached
-            rootPart.CFrame = newRotation * CFrame.new(0, rootPart.Size.Y / 2, 0)
-            -- Add prints to check velocities or state changes if you suspect them
-            -- if humanoid:GetState() == Enum.HumanoidStateType.Jumping then
-            --     print("Humanoid state is Jumping!")
-            -- end
-            -- print("RootPart Velocity:", rootPart.Velocity)
-        end
-    end
-end
-
-game:GetService("RunService").RenderStepped:Connect(function()
-    if aimbotEnabled then
-        if aimbotTarget and Players:FindFirstChild(aimbotTarget.Name) and aimbotTarget.Character and aimbotTarget.Character:FindFirstChild(aimPart) then
-            aimAt(aimbotTarget, aimPart, aimSmoothness)
-        elseif not aimbotTarget then
-            local closestEnemy = getClosestLivingEnemy()
-            if closestEnemy and closestEnemy.Character and closestEnemy.Character:FindFirstChild(aimPart) then
-                aimAt(closestEnemy, aimPart, aimSmoothness)
-            end
-        end
-    end
-end)
-
-local aimbotDropdown = Tabs.AimbotTab:Dropdown({
-    Title = "Игрок для аимбота",
-    Values = {"Нет", playerNames},
-    Value = "Нет",
-    Callback = function(playerName) -- This is the Callback function
-        print("Selected player in dropdown:", playerName) -- For debugging
-        if playerName == "Нет" then
-            aimbotTarget = nil
-        else
-            aimbotTarget = Players:FindFirstChild(playerName)
-        end
-    end
-})
-
-local function updateAimbotDropdown()
-    local playerNames = {"Нет"}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            table.insert(playerNames, player.Name)
-        end
-    end
-    aimbotDropdown:SetValues(playerNames)
-end
-
-Players.PlayerAdded:Connect(updateAimbotDropdown)
-Players.PlayerRemoving:Connect(updateAimbotDropdown)
-
-Tabs.AimbotTab:Toggle({
-    Title = "Аимбот ближайших врагов",
-    Default = false,
-    Callback = function(Aim)
-        aimbotEnabled = Aim
-        if Aim then
-            aimbotTarget = nil
-            updateAimbotDropdown() -- Ensure dropdown is updated when enabling closest enemy aimbot
-        end
-    end
-})
-
-Tabs.AimbotTab:Toggle({
-    Title = "Аимбот на выбранного игрока",
-    Default = false,
-    Callback = function(AimB)
-        aimbotEnabled = AimB
-        if not AimB then
-            aimbotTarget = nil
-            aimbotDropdown:SetValue("Нет")
-        else
-            updateAimbotDropdown() -- Ensure dropdown is updated when enabling targeted aimbot
-        end
-    end
-})
-
-Tabs.AimbotTab:Dropdown({
-    Title = "Часть тела для аима",
-    Values = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"},
-    Value = "Head",
-    Callback = function(part)
-        aimPart = part
-    end
-})
-
-Tabs.AimbotTab:Slider({
-    Title = "Сглаживание аима",
-    Min = 0,
-    Max = 1,
-    Default = 0.1,
-    Callback = function(value)
-        local step = 0.01 -- Define your desired step
-        aimSmoothness = math.floor(value / step + 0.5) * step -- Round to the nearest step
-    end
+-- Example usage of Paragraph (optional information)
+AimTab:Paragraph({
+    Title = "Aimbot Information",
+    Desc = "This is a basic aimbot. It will try to aim at the closest player within the specified radius when the activation key is held down. Use with caution.",
+    Color = "Grey"
 })
 
 -- Вкладка "Настройки"
@@ -522,6 +518,7 @@ Tabs.SettingsTab:Toggle({
         end)
     end
 })
+
 Tabs.SettingsTab:Button({
     Title = "Переподключиться",
     Desc = "Переподключает к серверу",
