@@ -537,7 +537,6 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
-
 -- Вкладка "Настройки"
 Tabs.SettingsTab:Toggle({
     Title = "Включить/Выключить NoClip",
@@ -548,4 +547,40 @@ Tabs.SettingsTab:Toggle({
             if localPlayer.Character then
                 for _, v in pairs(localPlayer.Character:GetDescendants()) do
                     if v:IsA('BasePart') and v.CanCollide and v.Name ~= "HumanoidRootPart" then
-                        v.CanColl
+                        v.CanCollide = false
+                    end
+                end
+            end
+        else
+            getgenv().Clip = true
+            if localPlayer.Character then
+                for _, v in pairs(localPlayer.Character:GetDescendants()) do
+                    if v:IsA('BasePart') and not v:IsA("Accessory") and v.Name ~= "HumanoidRootPart" then
+                        v.CanCollide = true
+                    end
+                end
+            end
+        end
+    end
+})
+
+Tabs.SettingsTab:Toggle({
+    Title = "Бесконечный прыжок",
+    Default = false,
+    Callback = function(s)
+        getgenv().InfJ = s
+        game:GetService("UserInputService").JumpRequest:Connect(function()
+            if getgenv().InfJ and localPlayer.Character and localPlayer.Character:FindFirstChildOfClass'Humanoid' then
+                localPlayer.Character:FindFirstChildOfClass'Humanoid':ChangeState("Jumping")
+            end
+        end)
+    end
+})
+
+Tabs.SettingsTab:Button({
+    Title = "Переподключиться",
+    Desc = "Переподключает к серверу",
+    Callback = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, localPlayer)
+    end
+})
