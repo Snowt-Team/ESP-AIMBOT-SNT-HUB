@@ -417,7 +417,6 @@ local camera = Workspace.CurrentCamera
 local isCameraLocked = false
 local lockedPlayer = nil
 local defaultCameraType = Enum.CameraType.Custom -- Или ваш желаемый по умолчанию
-local playerList = {}
 
 -- Targeting Indicator (BillboardGui)
 local targetIndicator = Instance.new("BillboardGui")
@@ -435,17 +434,6 @@ arrow.AnchorPoint = Vector2.new(0.5, 0.5)
 arrow.Parent = targetIndicator
 
 targetIndicator.Parent = Workspace
-
-local function updatePlayerListForDropdown()
-    local dropdownValues = {"None"} -- Добавляем опцию "None" для отключения слежения
-    for _, player in Players:GetPlayers() do
-        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            table.insert(dropdownValues, player.Name)
-        end
-    end
-    table.sort(dropdownValues) -- Сортируем имена игроков
-    return dropdownValues
-end
 
 local function getPlayerByName(playerName)
     if playerName == "None" then
@@ -492,6 +480,27 @@ local function updateCameraLookAt()
     end
 end
 
+local function getUpdatedPlayerList()
+    local dropdownValues = {"None"} -- Добавляем опцию "None"
+    for _, player in Players:GetPlayers() do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(dropdownValues, player.Name)
+        end
+    end
+    table.sort(dropdownValues)
+    return dropdownValues
+end
+
+-- Функция для обновления значений дропдауна (предполагается, что у вас есть доступ к UI элементу дропдауна)
+local function updateDropdownValues()
+    local newValues = getUpdatedPlayerList()
+    -- В зависимости от вашей UI библиотеки, вам нужно будет обновить
+    -- свойство Values дропдауна здесь.
+    -- Пример (может отличаться):
+    -- Tabs.AimbotTab.DropdownElement.Values = newValues
+    print("Updating dropdown values:", newValues) -- Заглушка для демонстрации
+end
+
 Tabs.AimbotTab:Toggle({
     Title = "Lock camera to target",
     Default = false,
@@ -500,6 +509,9 @@ Tabs.AimbotTab:Toggle({
         if Value == true then
             camera.CameraType = Enum.CameraType.Scriptable
             RunService.RenderStepped:Connect(updateCameraLookAt)
+            updateDropdownValues() -- Обновляем список при включении
+            local currentValue = Tabs.AimbotTab.DropdownElement.Value -- Предполагаем доступ к текущему значению
+            lockedPlayer = getPlayerByName(currentValue) -- Восстанавливаем заблокированного игрока, если он еще есть
         else
             camera.CameraType = defaultCameraType
             lockedPlayer = nil
@@ -509,7 +521,7 @@ Tabs.AimbotTab:Toggle({
                 if connection.Function == updateCameraLookAt then
                     connection:Disconnect()
                     break
-                end
+               
             end
         end
     end
@@ -517,8 +529,8 @@ Tabs.AimbotTab:Toggle({
 
 Tabs.AimbotTab:Dropdown({
     Title = "Change locked player",
-    Values = updatePlayerListForDropdown(),
-    Value = "None", -- Начальное значение
+    Values = getUpdatedPlayerList(), -- Изначальный список
+    Value = "None",
     Callback = function(selectedPlayerName)
         lockedPlayer = getPlayerByName(selectedPlayerName)
         if lockedPlayer and isCameraLocked then
@@ -526,26 +538,27 @@ Tabs.AimbotTab:Dropdown({
         elseif isCameraLocked then
             print("Camera lock disabled.")
         end
+    end,
+    -- Предполагаем, что у вас есть способ сохранить ссылку на элемент дропдауна
+    -- чтобы можно было обновлять его Values извне Callback'а.
+    -- Например:
+    -- DropdownElement = self
+})
+
+Tabs.AimbotTab:Button({
+    Title = "Update Player List",
+    Callback = function()
+        updateDropdownValues()
     end
 })
 
--- Обновление списка игроков при их добавлении или удалении
-Players.PlayerAdded:Connect(function(player)
-    -- Вам может потребоваться обновить значения дропдауна в UI здесь,
-    -- так как Callback дропдауна вызывается только при изменении значения.
-    -- В зависимости от вашей UI библиотеки, это может быть отдельная функция.
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    -- Аналогично, вам может потребоваться обновить значения дропдауна в UI.
-    if lockedPlayer == player then
-        lockedPlayer = nil
-        if isCameraLocked then
-            camera.CameraType = defaultCameraType
-            targetIndicator.Enabled = false
-        end
-    end
-end)
+-- Можно также добавить автоматическое обновление с интервалом (на ваше усмотрение)
+-- local updateInterval = 5 -- Каждые 5 секунд
+-- game:GetService(RunService).Heartbeat:Connect(function()
+--     if isCameraLocked then
+--         updateDropdownValues()
+--     end
+-- end)
 
 Tabs.AimbotTab:Button({
     Title = "Change locked player",
