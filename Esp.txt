@@ -368,7 +368,7 @@ end)
 
 
 
-Settings.Enabled = AimbotTab:Toggle({
+Tabs.AimbotTab:Toggle({
     Title = "Enable Aimbot",
     Default = false,
     Callback = function(state)
@@ -376,7 +376,7 @@ Settings.Enabled = AimbotTab:Toggle({
     end
 })
 
-Settings.AimKey = AimbotTab:Dropdown({
+Tabs.AimbotTab:Dropdown({
     Title = "Activation Key",
     Values = {"LeftShift", "RightShift", "E", "Q", "MouseButton1", "MouseButton2"},
     Value = "RightShift",
@@ -385,7 +385,7 @@ Settings.AimKey = AimbotTab:Dropdown({
     end
 })
 
-Settings.AimRadius = AimbotTab:Slider({
+Tabs.AimbotTab:Slider({
     Title = "Aim Radius",
     Value = {
         Min = 10,
@@ -397,7 +397,7 @@ Settings.AimRadius = AimbotTab:Slider({
     end
 })
 
-Settings.Prediction = AimbotTab:Toggle({
+Tabs.AimbotTab:Toggle({
     Title = "Enable Prediction",
     Default = false,
     Callback = function(state)
@@ -472,12 +472,6 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
--- Example usage of Paragraph (optional information)
-AimTab:Paragraph({
-    Title = "Aimbot Information",
-    Desc = "This is a basic aimbot. It will try to aim at the closest player within the specified radius when the activation key is held down. Use with caution.",
-    Color = "Grey"
-})
 
 -- Вкладка "Настройки"
 Tabs.SettingsTab:Toggle({
