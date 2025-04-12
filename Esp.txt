@@ -12,7 +12,7 @@ local Window = WindUI:CreateWindow({
     HasOutline = true,
     KeySystem = {
         Key = { "SnowtTest", "SnowtRelease" },
-        Note = "Введите ключ. Чтобы получить ключ, нажмите на кнопку 'Get Key' и отправьте мне сообщение.",
+        Note = "Введите ключ.",
         URL = "t.me/supreme_sigma",
         SaveKey = false,
     },
@@ -491,9 +491,9 @@ Tabs.AimbotTab:Slider({
     Min = 0,
     Max = 1,
     Default = 0.1,
-    Step = 0.01,
     Callback = function(value)
-        aimSmoothness = value
+        local step = 0.01 -- Define your desired step
+        aimSmoothness = math.floor(value / step + 0.5) * step -- Round to the nearest step
     end
 })
 
