@@ -366,14 +366,79 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager") -- Может потребоваться
 
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local Settings = {
+    Enabled = false,
+    AimRadius = 50,
+    TargetPart = "Head",
+    SmoothingFactor = 0.2,
+    ActivationTouch = "RightThumb" -- Пример: "LeftThumb", "RightThumb"
+}
+
+-- // UI (WindUI) - аналогично ПК версии, но без настроек клавиши
+
+-- // Функция поиска ближайшего игрока (аналогично ПК версии)
+local function getClosestMobileTarget()
+    -- ... (логика поиска ближайшего игрока) ...
+    return closestTarget, targetPart
+end
+
+local lastTargetPosition = nil
+local currentCameraCF = nil
+
+-- // Функция для плавной коррекции угла камеры
+local function smoothLookAt(lookVector)
+    if not currentCameraCF then
+        currentCameraCF = Camera.CFrame
+    end
+    local targetCF = CFrame.lookAt(Camera.CFrame.Position, Camera.CFrame.Position + lookVector)
+    currentCameraCF = currentCameraCF:Lerp(targetCF, Settings.SmoothingFactor)
+    Camera.CFrame = currentCameraCF
+end
+
+RunService.RenderStepped:Connect(function()
+    if Settings.Enabled and UserInputService:IsTouchDown(Enum.UserInputType[Settings.ActivationTouch]) then
+        local target, targetPart = getClosestMobileTarget()
+        if target and targetPart then
+            local targetPosition = targetPart.Position
+            local lookVector = (targetPosition - Camera.CFrame.Position).Unit
+            smoothLookAt(lookVector)
+            lastTargetPosition = targetPosition
+        else
+            currentCameraCF = nil
+            lastTargetPosition = nil
+        end
+    else
+        currentCameraCF = nil
+        lastTargetPosition = nil
+    end
+end)
+
+Tabs.AimbotTab:Toggle({
+    Title = "Enable mobile aimbot",
+    Default = false,
+    Callback = function(State)
+        
+end
+})
 
 Tabs.AimbotTab:Toggle({
     Title = "Enable Aimbot",
     Default = false,
     Callback = function(state)
         Settings.Enabled = state
-    end
+        if state == true then
+            getClosestPlayer()
+            aimAtTarget(target)
+        end
+end
 })
 
 Tabs.AimbotTab:Dropdown({
@@ -483,40 +548,4 @@ Tabs.SettingsTab:Toggle({
             if localPlayer.Character then
                 for _, v in pairs(localPlayer.Character:GetDescendants()) do
                     if v:IsA('BasePart') and v.CanCollide and v.Name ~= "HumanoidRootPart" then
-                        v.CanCollide = false
-                    end
-                end
-            end
-        else
-            getgenv().Clip = true
-            if localPlayer.Character then
-                for _, v in pairs(localPlayer.Character:GetDescendants()) do
-                    if v:IsA('BasePart') and not v:IsA("Accessory") and v.Name ~= "HumanoidRootPart" then
-                        v.CanCollide = true
-                    end
-                end
-            end
-        end
-    end
-})
-
-Tabs.SettingsTab:Toggle({
-    Title = "Бесконечный прыжок",
-    Default = false,
-    Callback = function(s)
-        getgenv().InfJ = s
-        game:GetService("UserInputService").JumpRequest:Connect(function()
-            if getgenv().InfJ and localPlayer.Character and localPlayer.Character:FindFirstChildOfClass'Humanoid' then
-                localPlayer.Character:FindFirstChildOfClass'Humanoid':ChangeState("Jumping")
-            end
-        end)
-    end
-})
-
-Tabs.SettingsTab:Button({
-    Title = "Переподключиться",
-    Desc = "Переподключает к серверу",
-    Callback = function()
-        game:GetService("TeleportService"):Teleport(game.PlaceId, localPlayer)
-    end
-})
+                        v.CanColl
