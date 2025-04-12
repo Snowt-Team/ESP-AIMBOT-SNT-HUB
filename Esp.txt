@@ -416,11 +416,8 @@ local localPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 local isCameraLocked = false
 local lockedPlayer = nil
-local defaultCameraType = Enum.CameraType.Custom -- Or your desired default
+local defaultCameraType = Enum.CameraType.Custom -- Или ваш желаемый по умолчанию
 local playerList = {}
-local currentPlayerIndex = 0
-local canChangeTarget = true
-local changeTargetDebounceTime = 0.5 -- Seconds
 
 -- Targeting Indicator (BillboardGui)
 local targetIndicator = Instance.new("BillboardGui")
@@ -431,60 +428,50 @@ targetIndicator.Enabled = false
 local arrow = Instance.new("ImageLabel")
 arrow.Size = UDim2.new(1, 0, 1, 0)
 arrow.BackgroundTransparency = 1
-arrow.Image = "rbxassetid://602361387" -- Replace with a suitable arrow image ID
-arrow.ImageColor3 = Color3.new(1, 1, 0) -- Yellow color
-arrow.Position = UDim2.new(0.5, 0, -1.5, 0) -- Position above
+arrow.Image = "rbxassetid://602361387" -- Замените на ID подходящей стрелки
+arrow.ImageColor3 = Color3.new(1, 1, 0) -- Желтый цвет
+arrow.Position = UDim2.new(0.5, 0, -1.5, 0) -- Позиция сверху
 arrow.AnchorPoint = Vector2.new(0.5, 0.5)
 arrow.Parent = targetIndicator
 
 targetIndicator.Parent = Workspace
 
-local function updatePlayerList()
-    playerList = {}
+local function updatePlayerListForDropdown()
+    local dropdownValues = {"None"} -- Добавляем опцию "None" для отключения слежения
     for _, player in Players:GetPlayers() do
         if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            table.insert(playerList, player)
+            table.insert(dropdownValues, player.Name)
         end
     end
-    table.sort(playerList, function(a, b) -- Sort by distance for potentially better initial target
-        if localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local distA = (a.Character.HumanoidRootPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
-            local distB = (b.Character.HumanoidRootPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
-            return distA < distB
-        else
-            return false
-        end
-    end)
-    -- Ensure the index is within bounds
-    if #playerList > 0 and currentPlayerIndex > #playerList then
-        currentPlayerIndex = 1
-    elseif #playerList == 0 then
-        lockedPlayer = nil
-    end
+    table.sort(dropdownValues) -- Сортируем имена игроков
+    return dropdownValues
 end
 
-local function getNextPlayer()
-    updatePlayerList()
-    if #playerList > 0 then
-        currentPlayerIndex = currentPlayerIndex % #playerList + 1
-        return playerList[currentPlayerIndex]
-    else
+local function getPlayerByName(playerName)
+    if playerName == "None" then
         return nil
     end
+    for _, player in Players:GetPlayers() do
+        if player.Name == playerName and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            return player
+        end
+    end
+    return nil
 end
 
 local function updateCameraLookAt()
     if isCameraLocked and localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") and lockedPlayer and lockedPlayer.Character and lockedPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        camera.CameraType = Enum.CameraType.Scriptable
         local localRootPosition = localPlayer.Character.HumanoidRootPart.Position
         local targetPosition = lockedPlayer.Character.HumanoidRootPart.Position
         local desiredLookAt = targetPosition
 
-        local cameraOffset = Vector3.new(0, 2, 5) -- Adjust as needed
+        local cameraOffset = Vector3.new(0, 2, 5) -- Настройте по желанию
         local lookAtCFrame = CFrame.lookAt(localRootPosition, desiredLookAt)
         local desiredCameraPosition = localRootPosition + lookAtCFrame:VectorToWorldSpace(cameraOffset)
 
         local tweenInfo = TweenInfo.new(
-            0.1, -- Duration for smooth transition
+            0.1, -- Длительность плавной анимации
             Enum.EasingStyle.Linear,
             Enum.EasingDirection.Out,
             0,
@@ -495,7 +482,7 @@ local function updateCameraLookAt()
         local cameraTween = TweenService:Create(camera, tweenInfo, {CFrame = CFrame.lookAt(desiredCameraPosition, desiredLookAt)})
         cameraTween:Play()
 
-        -- Update target indicator
+        -- Обновление индикатора цели
         targetIndicator.Adornee = lockedPlayer.Character.HumanoidRootPart
         targetIndicator.Enabled = true
     else
@@ -511,21 +498,13 @@ Tabs.AimbotTab:Toggle({
     Callback = function(Value)
         isCameraLocked = Value
         if Value == true then
-            updatePlayerList()
-            lockedPlayer = playerList[1] -- Start with the first available player
-            if lockedPlayer then
-                camera.CameraType = Enum.CameraType.Scriptable
-                RunService.RenderStepped:Connect(updateCameraLookAt)
-            else
-                camera.CameraType = defaultCameraType
-                isCameraLocked = false
-                targetIndicator.Enabled = false
-            end
+            camera.CameraType = Enum.CameraType.Scriptable
+            RunService.RenderStepped:Connect(updateCameraLookAt)
         else
             camera.CameraType = defaultCameraType
             lockedPlayer = nil
             targetIndicator.Enabled = false
-            -- Disconnect the RenderStepped connection
+            -- Отключение RenderStepped соединения
             for _, connection in pairs(RunService:GetConnections("RenderStepped")) do
                 if connection.Function == updateCameraLookAt then
                     connection:Disconnect()
@@ -535,6 +514,38 @@ Tabs.AimbotTab:Toggle({
         end
     end
 })
+
+Tabs.AimbotTab:Dropdown({
+    Title = "Change locked player",
+    Values = updatePlayerListForDropdown(),
+    Value = "None", -- Начальное значение
+    Callback = function(selectedPlayerName)
+        lockedPlayer = getPlayerByName(selectedPlayerName)
+        if lockedPlayer and isCameraLocked then
+            print("Camera locked to:", selectedPlayerName)
+        elseif isCameraLocked then
+            print("Camera lock disabled.")
+        end
+    end
+})
+
+-- Обновление списка игроков при их добавлении или удалении
+Players.PlayerAdded:Connect(function(player)
+    -- Вам может потребоваться обновить значения дропдауна в UI здесь,
+    -- так как Callback дропдауна вызывается только при изменении значения.
+    -- В зависимости от вашей UI библиотеки, это может быть отдельная функция.
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    -- Аналогично, вам может потребоваться обновить значения дропдауна в UI.
+    if lockedPlayer == player then
+        lockedPlayer = nil
+        if isCameraLocked then
+            camera.CameraType = defaultCameraType
+            targetIndicator.Enabled = false
+        end
+    end
+end)
 
 Tabs.AimbotTab:Button({
     Title = "Change locked player",
