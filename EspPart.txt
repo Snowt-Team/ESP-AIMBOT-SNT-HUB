@@ -1,0 +1,370 @@
+local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+
+local Window = WindUI:CreateWindow({
+    Title = "Универсальный ESP/AIMBOT | SNT HUB",
+    Icon = "eye",
+    Author = "SnOwT",
+    Folder = "SNT Hub",
+    Size = UDim2.fromOffset(440, 320),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 200,
+    HasOutline = true,
+    KeySystem = {
+        Key = { "SnowtTest", "SnowtRelease" },
+        Note = "Введите ключ.",
+        URL = "t.me/supreme_sigma",
+        SaveKey = false,
+    },
+})
+
+Window:EditOpenButton({
+    Title = "Открыть UI",
+    Icon = "monitor",
+    CornerRadius = UDim.new(0, 10),
+    StrokeThickness = 2,
+    Color = ColorSequence.new(
+        Color3.fromHex("FF0F7B"),
+        Color3.fromHex("F89B29")
+    ),
+    Draggable = true,
+})
+
+local Tabs = {
+    CharacterTab = Window:Tab({ Title = "Персонаж", Icon = "file-cog", Desc = "Изменение настроек вашего персонажа." }),
+    EspTab = Window:Tab({ Title = "ESP", Icon = "eye", Desc = "Позволяет видеть больше чем обычно." }),
+    SettingsTab = Window:Tab({ Title = "Настройки", Icon = "battery", Desc = "Различные настройки скрипта." }),
+    AimbotTab = Window:Tab({ Title = "Аимбот", Icon = "axe", Desc = "Автонаводка на врагов"
+    })
+}
+
+local Settings = {
+    Enabled = false,
+    AimKey = "RightShift",
+    AimRadius = 100,
+    PredictionFactor = 0.1,
+    SmoothingFactor = 0.1,
+    TargetPart = "Head",
+    OnlyVisible = true,
+    TeamCheck = false,
+}
+
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+local function isNumber(str)
+    return tonumber(str) ~= nil or str == 'inf'
+end
+
+getgenv().HitboxSize = 15
+getgenv().HitboxTransparency = 0.9
+getgenv().HitboxStatus = false
+getgenv().TeamCheck = false
+getgenv().Walkspeed = localPlayer.Character and localPlayer.Character.Humanoid.WalkSpeed or 16
+getgenv().Jumppower = localPlayer.Character and localPlayer.Character.Humanoid.JumpPower or 50
+getgenv().TPSpeed = 3
+getgenv().TPWalk = false
+getgenv().InfJ = false
+
+local espColor = Color3.fromRGB(255, 0, 0)
+local espTransparency = 0.5
+local Highlight
+
+Window:SelectTab(1)
+
+-- Вкладка "ESP"
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local localPlayer = Players.LocalPlayer
+local espNameTags = {}
+local espSettings = {
+    enabled = false,
+    color = Color3.fromRGB(255, 0, 0),
+    transparency = 0.5,
+    namesEnabled = false,
+    teamsEnabled = false,
+    healthEnabled = false,
+    distanceEnabled = false,
+    weaponEnabled = false
+}
+
+local function isAlive(player)
+    local character = player.Character
+    if character and character:FindFirstChild("Humanoid") then
+        return character:FindFirstChild("Humanoid").Health > 0
+    end
+    return false
+end
+
+local function getDistance(player)
+    if localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") and
+       player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        return (localPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+    else
+        return nil
+    end
+end
+
+local function getCurrentWeapon(player)
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid and humanoid.Tool ~= nil then
+            return humanoid.Tool.Name
+        end
+    end
+    return nil
+end
+
+local function createNameTag(targetPlayer)
+    if not isAlive(targetPlayer) then return end
+    local character = targetPlayer.Character or targetPlayer.CharacterAdded:Wait()
+    if not character then return end
+
+    local head = character:WaitForChild("Head")
+    if not head then return end
+
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Name = "NameEsp"
+    billboardGui.Adornee = head
+    billboardGui.AlwaysOnTop = true
+    billboardGui.Size = UDim2.new(0, 150, 0, 40)
+    billboardGui.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+
+    local mainLabel = Instance.new("TextLabel")
+    mainLabel.Name = "NameLabel"
+    mainLabel.Size = UDim2.new(1, 0, 1, 0)
+    mainLabel.BackgroundTransparency = 1
+    mainLabel.Text = targetPlayer.Name
+    mainLabel.TextColor3 = Color3.new(1, 1, 1)
+    mainLabel.TextScaled = true
+    mainLabel.Font = Enum.Font.SourceSansBold
+    mainLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    mainLabel.TextStrokeTransparency = 0
+    mainLabel.TextSize = 14
+    mainLabel.Parent = billboardGui
+
+    espNameTags[targetPlayer] = billboardGui
+    return billboardGui
+end
+
+local function removeNameTag(targetPlayer)
+    if espNameTags[targetPlayer] then
+        pcall(function()
+            espNameTags[targetPlayer]:Destroy()
+        end)
+        espNameTags[targetPlayer] = nil
+    end
+end
+
+local function updateNameTagInfo(player, nameTag)
+    if not nameTag or not isAlive(player) then return end
+
+    local text = player.Name
+    if espSettings.healthEnabled then
+        local character = player.Character
+        if character then
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                text = text .. "\nHealth: " .. math.floor(humanoid.Health)
+            end
+        end
+    end
+    if espSettings.distanceEnabled then
+        local distance = getDistance(player)
+        if distance then
+            text = text .. "\nDistance: " .. math.floor(distance)
+        end
+    end
+    if espSettings.weaponEnabled then
+        local weapon = getCurrentWeapon(player)
+        if weapon then
+            text = text .. "\nWeapon: " .. weapon
+        end
+    end
+
+    local mainLabel = nameTag:FindFirstChild("NameLabel")
+    if mainLabel then
+        mainLabel.Text = text
+    end
+end
+
+local function updateNameTagsVisibility()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local character = player.Character
+            if character and character:FindFirstChild("Head") then
+                if espSettings.namesEnabled or espSettings.teamsEnabled or espSettings.healthEnabled or espSettings.distanceEnabled or espSettings.weaponEnabled then
+                    if isAlive(player) then
+                        local nameTag = espNameTags[player]
+                        if not nameTag then
+                            nameTag = createNameTag(player)
+                        end
+                        if nameTag then -- Check if nameTag is valid
+                            local textColor = Color3.new(1, 1, 1)
+                            if espSettings.teamsEnabled then
+                                textColor = (player.TeamColor == localPlayer.TeamColor) and Color3.new(0, 255, 0) or Color3.new(255, 255, 255)
+                            end
+                            local mainLabel = nameTag:FindFirstChild("NameLabel")
+                            if mainLabel then
+                                mainLabel.TextColor3 = textColor
+                            end
+                            updateNameTagInfo(player, nameTag)
+                        end
+                    else
+                        removeNameTag(player)
+                    end
+                else
+                    removeNameTag(player)
+                end
+            end
+        end
+    end
+end
+
+local function updateHighlightESP(enabled, color, transparency)
+    for _, player in ipairs(Players:GetPlayers()) do
+        local character = player.Character
+        if player ~= localPlayer and character then
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid and isAlive(player) then
+                local highlight = character:FindFirstChild("Highlight")
+                if enabled then
+                    if not highlight then
+                        local newHighlight = Instance.new("Highlight")
+                        newHighlight.Parent = character
+                        highlight = newHighlight
+                    end
+                    highlight.FillColor = color
+                    highlight.FillTransparency = transparency
+                else
+                    if highlight then
+                        highlight:Destroy()
+                    end
+                end
+            else
+                if character:FindFirstChild("Highlight") then
+                    character:FindFirstChild("Highlight"):Destroy()
+                end
+            end
+        end
+    end
+end
+
+Tabs.EspTab:Toggle({
+    Title = "ESP игроков",
+    Default = false,
+    Callback = function(tog)
+        espSettings.enabled = tog
+        updateHighlightESP(tog, espSettings.color, espSettings.transparency)
+    end,
+})
+
+Tabs.EspTab:Dropdown({
+    Title = "Цвет ESP",
+    Values = { "Green", "Red", "Blue", "Yellow", "Pink", "Purple" },
+    Value = "Red",
+    Callback = function(option)
+        if option == "Green" then
+            espSettings.color = Color3.fromRGB(0, 255, 0)
+        elseif option == "Red" then
+            espSettings.color = Color3.fromRGB(255, 0, 0)
+        elseif option == "Blue" then
+            espSettings.color = Color3.fromRGB(0, 0, 255)
+        elseif option == "Yellow" then
+            espSettings.color = Color3.fromRGB(255, 255, 0)
+        elseif option == "Pink" then
+            espSettings.color = Color3.fromRGB(239, 14, 216)
+        elseif option == "Purple" then
+            espSettings.color = Color3.fromRGB(180, 14, 240)
+        end
+        if espSettings.enabled then
+            updateHighlightESP(true, espSettings.color, espSettings.transparency)
+        end
+    end,
+})
+
+Tabs.EspTab:Input({
+    Title = "Прозрачность ESP",
+    Default = "0.5",
+    Placeholder = "Введите прозрачность",
+    Callback = function(input)
+        local value = tonumber(input)
+        if typeof(value) == "number" then
+            espSettings.transparency = math.clamp(value, 0, 1)
+            if espSettings.enabled then
+                updateHighlightESP(true, espSettings.color, espSettings.transparency)
+            end
+        end
+    end,
+})
+
+Tabs.EspTab:Toggle({
+    Title = "ESP имена игроков",
+    Default = false,
+    Callback = function(enabled)
+        espSettings.namesEnabled = enabled
+        updateNameTagsVisibility()
+    end,
+})
+
+Tabs.EspTab:Toggle({
+    Title = "ESP команд",
+    Default = false,
+    Callback = function(Tesp)
+        espSettings.teamsEnabled = Tesp
+        updateNameTagsVisibility()
+    end
+})
+
+Tabs.EspTab:Toggle({
+    Title = "ESP здоровье игроков",
+    Default = false,
+    Callback = function(Value)
+        espSettings.healthEnabled = Value
+        updateNameTagsVisibility()
+    end
+})
+
+Tabs.EspTab:Toggle({
+    Title = "ESP расстояние до игроков",
+    Default = false,
+    Callback = function(Value)
+        espSettings.distanceEnabled = Value
+        updateNameTagsVisibility()
+    end
+})
+
+Tabs.EspTab:Toggle({
+    Title = "ESP оружие игроков",
+    Default = false,
+    Callback = function(Value)
+        espSettings.weaponEnabled = Value
+        updateNameTagsVisibility()
+    end
+})
+
+-- Обновление ESP при добавлении/удалении игрока и загрузке чанка
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        task.wait(0.5)
+        if espSettings.enabled then
+            updateHighlightESP(true, espSettings.color, espSettings.transparency)
+        end
+        updateNameTagsVisibility()
+        if espSettings.namesEnabled or espSettings.teamsEnabled or espSettings.healthEnabled or espSettings.distanceEnabled or espSettings.weaponEnabled then
+            createNameTag(player)
+        end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    removeNameTag(player)
+    if espSettings.enabled then
+        updateHighlightESP(true, espSettings.color, espSettings.transparency)
+    end
+end)
+
+game:GetService("RunService").Heartbeat:Connect(updateNameTagsVisibility)
