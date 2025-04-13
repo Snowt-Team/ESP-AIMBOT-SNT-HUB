@@ -1,0 +1,87 @@
+local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+
+local Window = WindUI:CreateWindow({
+    Title = "Универсальный ESP/AIMBOT | SNT HUB",
+    Icon = "eye",
+    Author = "SnOwT",
+    Folder = "SNT Hub",
+    Size = UDim2.fromOffset(440, 320),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 200,
+    HasOutline = true,
+    KeySystem = {
+        Key = { "SnowtTest", "SnowtRelease" },
+        Note = "Введите ключ.",
+        URL = "t.me/supreme_sigma",
+        SaveKey = false,
+    },
+})
+
+Window:EditOpenButton({
+    Title = "Открыть UI",
+    Icon = "monitor",
+    CornerRadius = UDim.new(0, 10),
+    StrokeThickness = 2,
+    Color = ColorSequence.new(
+        Color3.fromHex("FF0F7B"),
+        Color3.fromHex("F89B29")
+    ),
+    Draggable = true,
+})
+
+local Tabs = {
+    CharacterTab = Window:Tab({ Title = "Персонаж", Icon = "file-cog", Desc = "Изменение настроек вашего персонажа." }),
+    EspTab = Window:Tab({ Title = "ESP", Icon = "eye", Desc = "Позволяет видеть больше чем обычно." }),
+    SettingsTab = Window:Tab({ Title = "Настройки", Icon = "battery", Desc = "Различные настройки скрипта." }),
+    AimbotTab = Window:Tab({ Title = "Аимбот", Icon = "axe", Desc = "Автонаводка на врагов"
+    })
+}
+
+-- Вкладка "Настройки"
+Tabs.SettingsTab:Toggle({
+    Title = "Включить/Выключить NoClip",
+    Default = false,
+    Callback = function(Noclip)
+        if Noclip then
+            getgenv().Clip = false
+            if localPlayer.Character then
+                for _, v in pairs(localPlayer.Character:GetDescendants()) do
+                    if v:IsA('BasePart') and v.CanCollide and v.Name ~= "HumanoidRootPart" then
+                        v.CanCollide = false
+                    end
+                end
+            end
+        else
+            getgenv().Clip = true
+            if localPlayer.Character then
+                for _, v in pairs(localPlayer.Character:GetDescendants()) do
+                    if v:IsA('BasePart') and not v:IsA("Accessory") and v.Name ~= "HumanoidRootPart" then
+                        v.CanCollide = true
+                    end
+                end
+            end
+        end
+    end
+})
+
+Tabs.SettingsTab:Toggle({
+    Title = "Бесконечный прыжок",
+    Default = false,
+    Callback = function(s)
+        getgenv().InfJ = s
+        game:GetService("UserInputService").JumpRequest:Connect(function()
+            if getgenv().InfJ and localPlayer.Character and localPlayer.Character:FindFirstChildOfClass'Humanoid' then
+                localPlayer.Character:FindFirstChildOfClass'Humanoid':ChangeState("Jumping")
+            end
+        end)
+    end
+})
+
+Tabs.SettingsTab:Button({
+    Title = "Переподключиться",
+    Desc = "Переподключает к серверу",
+    Callback = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, localPlayer)
+    end
+})
