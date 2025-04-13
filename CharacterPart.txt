@@ -1,0 +1,162 @@
+local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+
+local Window = WindUI:CreateWindow({
+    Title = "Универсальный ESP/AIMBOT | SNT HUB",
+    Icon = "eye",
+    Author = "SnOwT",
+    Folder = "SNT Hub",
+    Size = UDim2.fromOffset(440, 320),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 200,
+    HasOutline = true,
+    KeySystem = {
+        Key = { "SnowtTest", "SnowtRelease" },
+        Note = "Введите ключ.",
+        URL = "t.me/supreme_sigma",
+        SaveKey = false,
+    },
+})
+
+Window:EditOpenButton({
+    Title = "Открыть UI",
+    Icon = "monitor",
+    CornerRadius = UDim.new(0, 10),
+    StrokeThickness = 2,
+    Color = ColorSequence.new(
+        Color3.fromHex("FF0F7B"),
+        Color3.fromHex("F89B29")
+    ),
+    Draggable = true,
+})
+
+local Tabs = {
+    CharacterTab = Window:Tab({ Title = "Персонаж", Icon = "file-cog", Desc = "Изменение настроек вашего персонажа." }),
+    EspTab = Window:Tab({ Title = "ESP", Icon = "eye", Desc = "Позволяет видеть больше чем обычно." }),
+    SettingsTab = Window:Tab({ Title = "Настройки", Icon = "battery", Desc = "Различные настройки скрипта." }),
+    AimbotTab = Window:Tab({ Title = "Аимбот", Icon = "axe", Desc = "Автонаводка на врагов"
+    })
+}
+
+local Settings = {
+    Enabled = false,
+    AimKey = "RightShift",
+    AimRadius = 100,
+    PredictionFactor = 0.1,
+    SmoothingFactor = 0.1,
+    TargetPart = "Head",
+    OnlyVisible = true,
+    TeamCheck = false,
+}
+
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+local function isNumber(str)
+    return tonumber(str) ~= nil or str == 'inf'
+end
+
+getgenv().HitboxSize = 15
+getgenv().HitboxTransparency = 0.9
+getgenv().HitboxStatus = false
+getgenv().TeamCheck = false
+getgenv().Walkspeed = localPlayer.Character and localPlayer.Character.Humanoid.WalkSpeed or 16
+getgenv().Jumppower = localPlayer.Character and localPlayer.Character.Humanoid.JumpPower or 50
+getgenv().TPSpeed = 3
+getgenv().TPWalk = false
+getgenv().InfJ = false
+
+local espColor = Color3.fromRGB(255, 0, 0)
+local espTransparency = 0.5
+local Highlight
+
+Window:SelectTab(1)
+
+-- Вкладка "Персонаж"
+Tabs.CharacterTab:Input({
+    Title = "Изменить скорость ходьбы",
+    Default = tostring(getgenv().Walkspeed),
+    Placeholder = "Введите скорость ходьбы:",
+    Callback = function(input)
+        if isNumber(input) then
+            getgenv().Walkspeed = tonumber(input)
+            if localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                localPlayer.Character.Humanoid.WalkSpeed = getgenv().Walkspeed
+            end
+        end
+    end,
+})
+
+Tabs.CharacterTab:Input({
+    Title = "Изменить силу прыжка",
+    Default = tostring(getgenv().Jumppower),
+    Placeholder = "Введите силу прыжка:",
+    Callback = function(input)
+        if isNumber(input) then
+            getgenv().Jumppower = tonumber(input)
+             if localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                localPlayer.Character.Humanoid.JumpPower = getgenv().Jumppower
+             end
+        end
+    end,
+})
+
+Tabs.CharacterTab:Toggle({
+    Title = "Изменить хитбокс",
+    Default = false,
+    Callback = function(state)
+        getgenv().HitboxStatus = state
+        game:GetService('RunService').RenderStepped:Connect(function()
+            if localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                if getgenv().HitboxStatus and getgenv().TeamCheck == false then
+                    for _, player in pairs(Players:GetPlayers()) do
+                        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            pcall(function()
+                                player.Character.HumanoidRootPart.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
+                                player.Character.HumanoidRootPart.Transparency = getgenv().HitboxTransparency
+                                player.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really black")
+                                player.Character.HumanoidRootPart.Material = "Neon"
+                                player.Character.HumanoidRootPart.CanCollide = false
+                            end)
+                        end
+                    end
+                elseif getgenv().HitboxStatus and getgenv().TeamCheck == true then
+                    for _, player in pairs(Players:GetPlayers()) do
+                        if localPlayer.Team ~= player.Team and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            pcall(function()
+                                player.Character.HumanoidRootPart.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
+                                player.Character.HumanoidRootPart.Transparency = getgenv().HitboxTransparency
+                                player.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really black")
+                                player.Character.HumanoidRootPart.Material = "Neon"
+                                player.Character.HumanoidRootPart.CanCollide = false
+                            end)
+                        end
+                    end
+                else
+                    for _, player in pairs(Players:GetPlayers()) do
+                        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            pcall(function()
+                                player.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 1)
+                                player.Character.HumanoidRootPart.Transparency = 1
+                                player.Character.HumanoidRootPart.BrickColor = BrickColor.new("Medium stone grey")
+                                player.Character.HumanoidRootPart.Material = "Plastic"
+                                player.Character.HumanoidRootPart.CanCollide = false
+                            end)
+                        end
+                    end
+                end
+            end
+        end)
+    end,
+})
+
+Tabs.CharacterTab:Input({
+    Title = "Размер хитбокса",
+    Default = tostring(getgenv().HitboxSize),
+    Placeholder = "Введите размер хитбокса:",
+    Callback = function(input)
+        if isNumber(input) then
+            getgenv().HitboxSize = tonumber(input)
+        end
+    end,
+})
