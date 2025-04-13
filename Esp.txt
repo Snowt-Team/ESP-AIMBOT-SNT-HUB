@@ -378,6 +378,8 @@ local camera = Workspace.CurrentCamera
 local isCameraLocked = false
 local lockedPlayer = nil
 local defaultCameraType = Enum.CameraType.Custom
+local lockRadius = 50 -- Значение по умолчанию для радиуса
+local cameraRotationSpeed = 0.1 -- Скорость вращения камеры (чем меньше, тем медленнее)
 
 -- Targeting Indicator (BillboardGui)
 local targetIndicator = Instance.new("BillboardGui")
@@ -396,6 +398,30 @@ arrow.Parent = targetIndicator
 
 targetIndicator.Parent = Workspace
 
+local function getNearestPlayer(radius)
+    local nearestPlayer = nil
+    local minDistanceSquared = math.huge
+
+    if not localPlayer or not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return nil
+    end
+
+    local localRootPart = localPlayer.Character.HumanoidRootPart.Position
+
+    for _, player in Players:GetPlayers() do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local otherRootPart = player.Character.HumanoidRootPart.Position
+            local distanceSquared = (localRootPart - otherRootPart).Magnitude^2
+
+            if distanceSquared <= radius^2 and distanceSquared < minDistanceSquared then
+                minDistanceSquared = distanceSquared
+                nearestPlayer = player
+            end
+        end
+    end
+    return nearestPlayer
+end
+
 local function getPlayerByName(playerName)
     if playerName == "None" then
         return nil
@@ -409,30 +435,37 @@ local function getPlayerByName(playerName)
 end
 
 local function updateCameraLookAt()
-    if isCameraLocked and localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") and lockedPlayer and lockedPlayer.Character and lockedPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        camera.CameraType = Enum.CameraType.Scriptable
-        local localRootPosition = localPlayer.Character.HumanoidRootPart.Position
-        local targetPosition = lockedPlayer.Character.HumanoidRootPart.Position
-        local desiredLookAt = targetPosition
+    if isCameraLocked and localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local targetPosition = nil
+        if lockedPlayer and lockedPlayer.Character and lockedPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            targetPosition = lockedPlayer.Character.HumanoidRootPart.Position
+        elseif isCameraLocked then -- Попытка найти ближайшего, если игрок не выбран вручную
+            local nearest = getNearestPlayer(lockRadius)
+            if nearest then
+                lockedPlayer = nearest
+                targetPosition = lockedPlayer.Character.HumanoidRootPart.Position
+            end
+        end
 
-        local cameraOffset = Vector3.new(0, 2, 5)
-        local lookAtCFrame = CFrame.lookAt(localRootPosition, desiredLookAt)
-        local desiredCameraPosition = localRootPosition + lookAtCFrame:VectorToWorldSpace(cameraOffset)
+        if targetPosition then
+            camera.CameraType = Enum.CameraType.Scriptable
+            local localRootPosition = localPlayer.Character.HumanoidRootPart.Position
+            local desiredLookAt = targetPosition
+            local cameraOffset = Vector3.new(0, 2, 5)
+            local desiredCameraPosition = localRootPosition + (desiredLookAt - localRootPosition).Unit * cameraOffset.Z + Vector3.new(0, cameraOffset.Y, 0)
 
-        local tweenInfo = TweenInfo.new(
-            0.1,
-            Enum.EasingStyle.Linear,
-            Enum.EasingDirection.Out,
-            0,
-            false,
-            0
-        )
+            local currentCF = camera.CFrame
+            local desiredCF = CFrame.lookAt(desiredCameraPosition, desiredLookAt)
 
-        local cameraTween = TweenService:Create(camera, tweenInfo, {CFrame = CFrame.lookAt(desiredCameraPosition, desiredLookAt)})
-        cameraTween:Play()
+            camera.CFrame = currentCF:Lerp(desiredCF, cameraRotationSpeed)
 
-        targetIndicator.Adornee = lockedPlayer.Character.HumanoidRootPart
-        targetIndicator.Enabled = true
+            targetIndicator.Adornee = lockedPlayer.Character.HumanoidRootPart
+            targetIndicator.Enabled = true
+        else
+            camera.CameraType = defaultCameraType
+            lockedPlayer = nil
+            targetIndicator.Enabled = false
+        end
     else
         camera.CameraType = defaultCameraType
         lockedPlayer = nil
@@ -451,11 +484,10 @@ local function getUpdatedPlayerList()
     return dropdownValues
 end
 
--- Предполагаем, что Tabs.AimbotTab.DropdownElement содержит ссылку на объект Dropdown Wind UI
 local dropdownElement
 
 Tabs.AimbotTab:Toggle({
-    Title = "Lock camera to target",
+    Title = "Сфокусировать камеру на игрока",
     Default = false,
     Callback = function(Value)
         isCameraLocked = Value
@@ -465,8 +497,11 @@ Tabs.AimbotTab:Toggle({
             if dropdownElement then
                 dropdownElement:Set("Values", getUpdatedPlayerList())
             end
-            if dropdownElement then
+            if dropdownElement and dropdownElement.Value ~= "None" then
                 lockedPlayer = getPlayerByName(dropdownElement.Value)
+            elseif Value == true and dropdownElement and dropdownElement.Value == "None" then
+                -- При включении и отсутствии выбранного игрока, пытаемся найти ближайшего
+                lockedPlayer = getNearestPlayer(lockRadius)
             end
         else
             camera.CameraType = defaultCameraType
@@ -483,7 +518,7 @@ Tabs.AimbotTab:Toggle({
 })
 
 dropdownElement = Tabs.AimbotTab:Dropdown({
-    Title = "Change locked player",
+    Title = "Сменить фокус на другого игрока",
     Values = getUpdatedPlayerList(),
     Value = "None",
     Callback = function(selectedPlayerName)
@@ -496,8 +531,20 @@ dropdownElement = Tabs.AimbotTab:Dropdown({
     end
 })
 
+Tabs.AimbotTab:Slider({
+    Title = "Радиус фокуса",
+    Value = {min = 10, max = 200, default = lockRadius},
+    Callback = function(Value)
+        lockRadius = Value
+        print("Lock radius changed to:", lockRadius)
+        if isCameraLocked and not lockedPlayer then -- Если ручной выбор не активен, пытаемся обновить цель
+            lockedPlayer = getNearestPlayer(lockRadius)
+        end
+    end
+})
+
 Tabs.AimbotTab:Button({
-    Title = "Update Player List",
+    Title = "Обновить список игроков",
     Callback = function()
         if dropdownElement then
             dropdownElement:Set("Values", getUpdatedPlayerList())
