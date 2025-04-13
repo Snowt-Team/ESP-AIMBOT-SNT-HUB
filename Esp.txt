@@ -162,9 +162,30 @@ Tabs.CharacterTab:Input({
 })
 
 -- Вкладка "ESP"
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local localPlayer = Players.LocalPlayer
 local espNameTags = {}
+local espSettings = {
+    enabled = false,
+    color = Color3.fromRGB(255, 0, 0),
+    transparency = 0.5,
+    namesEnabled = false,
+    teamsEnabled = false
+}
+
+local function isAlive(player)
+    local character = player.Character
+    if character and character:FindFirstChild("Humanoid") then
+        return character:FindFirstChild("Humanoid").Health > 0
+    end
+    return false
+end
 
 local function createNameTag(targetPlayer)
+    if not isAlive(targetPlayer) then return end
     local character = targetPlayer.Character or targetPlayer.CharacterAdded:Wait()
     if not character then return end
 
@@ -193,8 +214,9 @@ local function createNameTag(targetPlayer)
     billboardGui.Parent = character
     espNameTags[targetPlayer] = billboardGui
 end
+
 local function removeNameTag(targetPlayer)
-    if espNameTags and espNameTags[targetPlayer] then
+    if espNameTags[targetPlayer] then
         pcall(function()
             espNameTags[targetPlayer]:Destroy()
         end)
@@ -202,28 +224,74 @@ local function removeNameTag(targetPlayer)
     end
 end
 
-local function updateNameTags(enabled, useTeamColor)
+local function updateSingleNameTag(player, useTeamColor)
+    local nametag = espNameTags[player]
+    if nametag and isAlive(player) then
+        local textLabel = nametag:FindFirstChild("TextLabel")
+        if textLabel then
+            local textColor = Color3.new(1, 1, 1)
+            if useTeamColor then
+                textColor = (player.TeamColor == localPlayer.TeamColor) and Color3.new(0, 255, 0) or Color3.new(255, 255, 255)
+            end
+            textLabel.TextColor3 = textColor
+        end
+    elseif nametag and not isAlive(player) then
+        removeNameTag(player)
+    end
+end
+
+local function updateNameTagsVisibility()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             local character = player.Character
             if character and character:FindFirstChild("Head") then
-                if enabled then
-                    if not espNameTags or not espNameTags[player] then
-                        createNameTag(player) -- Assuming createNameTag is defined elsewhere
-                    end
-                     local textColor = Color3.new(1,1,1)
-                    if useTeamColor then
-                         textColor = (player.TeamColor == localPlayer.TeamColor) and Color3.new(0, 255, 0) or Color3.new(255,255,255)
-                    end
-                    local nametag = espNameTags and espNameTags[player]
-                    if nametag then
-                        local textLabel = nametag:FindFirstChild("TextLabel")
-                        if textLabel then
-                            textLabel.TextColor3 = textColor
+                if espSettings.namesEnabled or espSettings.teamsEnabled then
+                    if isAlive(player) then
+                        if not espNameTags[player] then
+                            createNameTag(player)
                         end
+                        updateSingleNameTag(player, espSettings.teamsEnabled)
+                        if espSettings.namesEnabled and not espSettings.teamsEnabled then
+                            local nametag = espNameTags[player]
+                            if nametag and nametag:FindFirstChild("TextLabel") then
+                                nametag:FindFirstChild("TextLabel").TextColor3 = Color3.new(1, 1, 1)
+                            end
+                        elseif espSettings.teamsEnabled then
+                            updateSingleNameTag(player, true)
+                        end
+                    else
+                        removeNameTag(player)
                     end
                 else
                     removeNameTag(player)
+                end
+            end
+        end
+    end
+end
+
+local function updateHighlightESP(enabled, color, transparency)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
+            if isAlive(player) then
+                local highlight = player.Character:FindFirstChild("Highlight")
+                if enabled then
+                    if not highlight then
+                        local newHighlight = Instance.new("Highlight")
+                        newHighlight.Parent = player.Character
+                        highlight = newHighlight
+                    end
+                    highlight.FillColor = color
+                    highlight.FillTransparency = transparency
+                else
+                    if highlight then
+                        highlight:Destroy()
+                    end
+                end
+            else
+                local highlight = player.Character:FindFirstChild("Highlight")
+                if highlight then
+                    highlight:Destroy()
                 end
             end
         end
@@ -234,26 +302,8 @@ Tabs.EspTab:Toggle({
     Title = "ESP игроков",
     Default = false,
     Callback = function(tog)
-        _G.espits = tog
-        for i, v in pairs(game.Workspace:GetDescendants()) do
-            if v:IsA("Model") and v:FindFirstChild("Humanoid") then
-                local highlight = v:FindFirstChild("Highlight")
-                if tog then
-                    if not highlight then
-                        Highlight = Instance.new("Highlight", v)
-                        Highlight.FillColor = espColor or Color3.fromRGB(255, 0, 0)
-                        Highlight.FillTransparency = espTransparency or 0.5
-                    else
-                        highlight.FillColor = espColor or Color3.fromRGB(255, 0, 0)
-                        highlight.FillTransparency = espTransparency or 0.5
-                    end
-                else
-                    if highlight then
-                        highlight:Destroy()
-                    end
-                end
-            end
-        end
+        espSettings.enabled = tog
+        updateHighlightESP(tog, espSettings.color, espSettings.transparency)
     end,
 })
 
@@ -263,27 +313,20 @@ Tabs.EspTab:Dropdown({
     Value = "Red",
     Callback = function(option)
         if option == "Green" then
-            espColor = Color3.fromRGB(0, 255, 0)
+            espSettings.color = Color3.fromRGB(0, 255, 0)
         elseif option == "Red" then
-            espColor = Color3.fromRGB(255, 0, 0)
+            espSettings.color = Color3.fromRGB(255, 0, 0)
         elseif option == "Blue" then
-            espColor = Color3.fromRGB(0, 0, 255)
+            espSettings.color = Color3.fromRGB(0, 0, 255)
         elseif option == "Yellow" then
-            espColor = Color3.fromRGB(255, 255, 0)
+            espSettings.color = Color3.fromRGB(255, 255, 0)
         elseif option == "Pink" then
-            espColor = Color3.fromRGB(239, 14, 216)
+            espSettings.color = Color3.fromRGB(239, 14, 216)
         elseif option == "Purple" then
-            espColor = Color3.fromRGB(180, 14, 240)
+            espSettings.color = Color3.fromRGB(180, 14, 240)
         end
-        if _G.espits then
-            for i, v in pairs(game.Workspace:GetDescendants()) do
-                if v:IsA("Model") and v:FindFirstChild("Humanoid") then
-                    local highlight = v:FindFirstChild("Highlight")
-                    if highlight then
-                        highlight.FillColor = espColor
-                    end
-                end
-            end
+        if espSettings.enabled then
+            updateHighlightESP(true, espSettings.color, espSettings.transparency)
         end
     end,
 })
@@ -295,19 +338,9 @@ Tabs.EspTab:Input({
     Callback = function(input)
         local value = tonumber(input)
         if typeof(value) == "number" then
-            espTransparency = math.clamp(value, 0, 1)
-            if Highlight then
-                Highlight.FillTransparency = espTransparency
-            end
-            if _G.espits then
-                for i, v in pairs(game.Workspace:GetDescendants()) do
-                    if v:IsA("Model") and v:FindFirstChild("Humanoid") then
-                        local highlight = v:FindFirstChild("Highlight")
-                        if highlight then
-                            highlight.FillTransparency = espTransparency
-                        end
-                    end
-                end
+            espSettings.transparency = math.clamp(value, 0, 1)
+            if espSettings.enabled then
+                updateHighlightESP(true, espSettings.color, espSettings.transparency)
             end
         end
     end,
@@ -317,8 +350,8 @@ Tabs.EspTab:Toggle({
     Title = "ESP имена игроков",
     Default = false,
     Callback = function(enabled)
-        nameTagsEnabled = enabled -- Assuming nameTagsEnabled is a global variable
-        updateNameTags(enabled, false)
+        espSettings.namesEnabled = enabled
+        updateNameTagsVisibility()
     end,
 })
 
@@ -326,45 +359,38 @@ Tabs.EspTab:Toggle({
     Title = "ESP команд",
     Default = false,
     Callback = function(Tesp)
-        updateNameTags(Tesp, true)
+        espSettings.teamsEnabled = Tesp
+        updateNameTagsVisibility()
     end
 })
 
 -- Обновление ESP при добавлении/удалении игрока и загрузке чанка
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function(character)
-        wait(0.5)
-        if _G.espits then
-            for i, v in pairs(game.Workspace:GetDescendants()) do
-                if v:IsA("Model") and v:FindFirstChild("Humanoid") then
-                    local highlight = v:FindFirstChild("Highlight")
-                    if not highlight then
-                        Highlight = Instance.new("Highlight", v)
-                        Highlight.FillColor = espColor or Color3.fromRGB(255, 0, 0)
-                        Highlight.FillTransparency = espTransparency or 0.5
-                    else
-                        highlight.FillColor = espColor or Color3.fromRGB(255, 0, 0)
-                        highlight.FillTransparency = espTransparency or 0.5
-                    end
-                end
-            end
+        task.wait(0.5)
+        if espSettings.enabled then
+            updateHighlightESP(true, espSettings.color, espSettings.transparency)
+        end
+        updateNameTagsVisibility()
+        if espSettings.namesEnabled or espSettings.teamsEnabled then
+            createNameTag(player)
+            updateSingleNameTag(player, espSettings.teamsEnabled)
         end
     end)
+    if espSettings.namesEnabled or espSettings.teamsEnabled then
+        createNameTag(player)
+        updateSingleNameTag(player, espSettings.teamsEnabled)
+    end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
     removeNameTag(player)
-    if _G.espits then
-        for i, v in pairs(game.Workspace:GetDescendants()) do
-            if v:IsA("Model") and v:FindFirstChild("Humanoid") then
-                local highlight = v:FindFirstChild("Highlight")
-                if highlight then
-                    highlight:Destroy()
-                end
-            end
-        end
+    if espSettings.enabled then
+        updateHighlightESP(true, espSettings.color, espSettings.transparency)
     end
 end)
+
+game:GetService("RunService").Heartbeat:Connect(updateNameTagsVisibility)
 
 -- Вкладка "Аимбот"
 local UserInputService = game:GetService("UserInputService")
