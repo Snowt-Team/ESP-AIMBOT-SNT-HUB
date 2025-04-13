@@ -173,7 +173,10 @@ local espSettings = {
     color = Color3.fromRGB(255, 0, 0),
     transparency = 0.5,
     namesEnabled = false,
-    teamsEnabled = false
+    teamsEnabled = false,
+    healthEnabled = false,
+    distanceEnabled = false,
+    weaponEnabled = false
 }
 
 local function isAlive(player)
@@ -182,6 +185,26 @@ local function isAlive(player)
         return character:FindFirstChild("Humanoid").Health > 0
     end
     return false
+end
+
+local function getDistance(player)
+    if localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") and
+       player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        return (localPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+    else
+        return nil
+    end
+end
+
+local function getCurrentWeapon(player)
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid and humanoid.Tool ~= nil then
+            return humanoid.Tool.Name
+        end
+    end
+    return nil
 end
 
 local function createNameTag(targetPlayer)
@@ -196,23 +219,23 @@ local function createNameTag(targetPlayer)
     billboardGui.Name = "NameEsp"
     billboardGui.Adornee = head
     billboardGui.AlwaysOnTop = true
-    billboardGui.Size = UDim2.new(0, 100, 0, 20)
+    billboardGui.Size = UDim2.new(0, 150, 0, 40) -- Увеличиваем размер для дополнительной информации
     billboardGui.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
 
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, 0, 1, 0)
-    textLabel.BackgroundTransparency = 1
-    textLabel.Text = targetPlayer.Name
-    textLabel.TextColor3 = Color3.new(1, 1, 1)
-    textLabel.TextScaled = true
-    textLabel.Font = Enum.Font.SourceSansBold
-    textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-    textLabel.TextStrokeTransparency = 0
-    textLabel.TextSize = 14
-    textLabel.Parent = billboardGui
+    local mainLabel = Instance.new("TextLabel")
+    mainLabel.Size = UDim2.new(1, 0, 1, 0)
+    mainLabel.BackgroundTransparency = 1
+    mainLabel.Text = targetPlayer.Name
+    mainLabel.TextColor3 = Color3.new(1, 1, 1)
+    mainLabel.TextScaled = true
+    mainLabel.Font = Enum.Font.SourceSansBold
+    mainLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    mainLabel.TextStrokeTransparency = 0
+    mainLabel.TextSize = 14
+    mainLabel.Parent = billboardGui
 
-    billboardGui.Parent = character
     espNameTags[targetPlayer] = billboardGui
+    return billboardGui
 end
 
 local function removeNameTag(targetPlayer)
@@ -224,19 +247,35 @@ local function removeNameTag(targetPlayer)
     end
 end
 
-local function updateSingleNameTag(player, useTeamColor)
-    local nametag = espNameTags[player]
-    if nametag and isAlive(player) then
-        local textLabel = nametag:FindFirstChild("TextLabel")
-        if textLabel then
-            local textColor = Color3.new(1, 1, 1)
-            if useTeamColor then
-                textColor = (player.TeamColor == localPlayer.TeamColor) and Color3.new(0, 255, 0) or Color3.new(255, 255, 255)
+local function updateNameTagInfo(player, nameTag)
+    if not nameTag or not isAlive(player) then return end
+
+    local text = player.Name
+    if espSettings.healthEnabled then
+        local character = player.Character
+        if character then
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                text = text .. "\nHealth: " .. math.floor(humanoid.Health)
             end
-            textLabel.TextColor3 = textColor
         end
-    elseif nametag and not isAlive(player) then
-        removeNameTag(player)
+    end
+    if espSettings.distanceEnabled then
+        local distance = getDistance(player)
+        if distance then
+            text = text .. "\nDistance: " .. math.floor(distance)
+        end
+    end
+    if espSettings.weaponEnabled then
+        local weapon = getCurrentWeapon(player)
+        if weapon then
+            text = text .. "\nWeapon: " .. weapon
+        end
+    end
+
+    local mainLabel = nameTag:FindFirstChild("TextLabel")
+    if mainLabel then
+        mainLabel.Text = text
     end
 end
 
@@ -245,20 +284,21 @@ local function updateNameTagsVisibility()
         if player ~= localPlayer then
             local character = player.Character
             if character and character:FindFirstChild("Head") then
-                if espSettings.namesEnabled or espSettings.teamsEnabled then
+                if espSettings.namesEnabled or espSettings.teamsEnabled or espSettings.healthEnabled or espSettings.distanceEnabled or espSettings.weaponEnabled then
+                    local nameTag = espNameTags[player]
                     if isAlive(player) then
-                        if not espNameTags[player] then
-                            createNameTag(player)
+                        if not nameTag then
+                            nameTag = createNameTag(player)
                         end
-                        updateSingleNameTag(player, espSettings.teamsEnabled)
-                        if espSettings.namesEnabled and not espSettings.teamsEnabled then
-                            local nametag = espNameTags[player]
-                            if nametag and nametag:FindFirstChild("TextLabel") then
-                                nametag:FindFirstChild("TextLabel").TextColor3 = Color3.new(1, 1, 1)
-                            end
-                        elseif espSettings.teamsEnabled then
-                            updateSingleNameTag(player, true)
+                        local textColor = Color3.new(1, 1, 1)
+                        if espSettings.teamsEnabled then
+                            textColor = (player.TeamColor == localPlayer.TeamColor) and Color3.new(0, 255, 0) or Color3.new(255, 255, 255)
                         end
+                        local mainLabel = nameTag:FindFirstChild("TextLabel")
+                        if mainLabel then
+                            mainLabel.TextColor3 = textColor
+                        end
+                        updateNameTagInfo(player, nameTag)
                     else
                         removeNameTag(player)
                     end
@@ -364,6 +404,33 @@ Tabs.EspTab:Toggle({
     end
 })
 
+Tabs.EspTab:Toggle({
+    Title = "ESP здоровье игроков",
+    Default = false,
+    Callback = function(Value)
+        espSettings.healthEnabled = Value
+        updateNameTagsVisibility()
+    end
+})
+
+Tabs.EspTab:Toggle({
+    Title = "ESP расстояние до игроков",
+    Default = false,
+    Callback = function(Value)
+        espSettings.distanceEnabled = Value
+        updateNameTagsVisibility()
+    end
+})
+
+Tabs.EspTab:Toggle({
+    Title = "ESP оружие игроков",
+    Default = false,
+    Callback = function(Value)
+        espSettings.weaponEnabled = Value
+        updateNameTagsVisibility()
+    end
+})
+
 -- Обновление ESP при добавлении/удалении игрока и загрузке чанка
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function(character)
@@ -372,14 +439,14 @@ Players.PlayerAdded:Connect(function(player)
             updateHighlightESP(true, espSettings.color, espSettings.transparency)
         end
         updateNameTagsVisibility()
-        if espSettings.namesEnabled or espSettings.teamsEnabled then
+        if espSettings.namesEnabled or espSettings.teamsEnabled or espSettings.healthEnabled or espSettings.distanceEnabled or espSettings.weaponEnabled then
             createNameTag(player)
-            updateSingleNameTag(player, espSettings.teamsEnabled)
+            updateNameTagInfo(player, espNameTags[player])
         end
     end)
-    if espSettings.namesEnabled or espSettings.teamsEnabled then
+    if espSettings.namesEnabled or espSettings.teamsEnabled or espSettings.healthEnabled or espSettings.distanceEnabled or espSettings.weaponEnabled then
         createNameTag(player)
-        updateSingleNameTag(player, espSettings.teamsEnabled)
+        updateNameTagInfo(player, espNameTags[player])
     end
 end)
 
